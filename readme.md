@@ -1,3 +1,10 @@
+
+
+
+# PheauxWAS and pyPheWASA
+
+PheaxWAS is a single-script pheWAS python script that runs a phewas study
+
 ## To get python to read numpy and the pheauxWAS.py
 
 you need to use the function (crtl-cmd-p) "python: select interpreter" and do the venv. That has numpy. Soon i'll figure out how to do global but that's later
@@ -17,5 +24,15 @@ python3 bundling/make_bundle.py --out bundling/pheauxwas_bundle.py \
   --note "pheauxWAS 1.1.0 + pyPheWAS commit 2a8fff1"
 
 ```
-In theory this should patch it. pheauxWAS is my thing, and phyPheWAS last had a push 3 years go, so that commit is likely the last for a while. 
 
+
+For file exclusion, how the path works: it's relative to the folder you run the command from. So --exclude-file README.md drops only the README in pheauxwas_build itself. I tested this: the top-level README was left out and pyPheWAS/README.md was kept.
+
+pyPheWAS's README too: add --exclude-file pyPheWAS/README.md.
+Other files: repeat --exclude-file once per file.
+Every .md file everywhere: add md to the --exclude-ext list instead.
+
+
+## WHat's inside
+
+pheauxWAS is my thing, and phyPheWAS last had a push 3 years go, so that commit is likely the last for a while.
