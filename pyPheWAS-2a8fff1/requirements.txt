@@ -1,0 +1,10 @@
+numpy
+matplotlib
+scipy
+pandas
+statsmodels
+tqdm
+hopcroftkarp
+biopython
+flask
+flask_cors

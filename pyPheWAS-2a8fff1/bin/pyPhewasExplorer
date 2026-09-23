@@ -1,0 +1,53 @@
+#!/usr/bin/env python
+
+import argparse
+
+parser = argparse.ArgumentParser(description='pyPheWAS Explorer Launch Script')
+parser.add_argument('--indir', required=False, default='.', type=str, help='Input directory for pyPheWAS analysis')
+args = parser.parse_args()
+
+
+"""
+Print Start Message
+"""
+from subprocess import Popen
+from pathlib import Path
+from pyPheWAS.pyPhewasCorev2 import print_start_msg
+from pyPheWAS.pyPhewasExplorerCore import run_Explorer_GUI
+
+print_start_msg()
+print('\npyPheWAS Explorer: Interactive Visualization of PheWAS models\n')
+
+"""
+Retrieve and validate all arguments.
+"""
+data_path = Path(args.indir).resolve()
+
+# Assert that valid directory was given
+assert data_path.exists(), "%s does not exist" % data_path
+assert data_path.is_dir(), "%s is not a valid directory" % data_path
+
+# Assert that required input files exist
+group_f = data_path / "group.csv"
+assert group_f.exists(), "%s does not contain a group file (group.csv)" % data_path
+
+icd_f = data_path / "icds.csv"
+bin_fm_f = data_path / "binary_feature_matrix.csv"
+cnt_fm_f = data_path / "count_feature_matrix.csv"
+dur_fm_f = data_path / "duration_feature_matrix.csv"
+FMs_exist = bin_fm_f.exists() & cnt_fm_f.exists() & dur_fm_f.exists()
+assert icd_f.exists() | FMs_exist, "%s does not contain an EMR file (icds.csv)" % data_path
+
+print("Setting up pyPheWAS Explorer using data found in %s" % data_path)
+
+
+"""
+Launch the servers
+"""
+
+# Launch the flask server (Back End) as a subprocess
+exec_path = Path(__file__).parent.absolute()/'pyPhewasExplorerBackEnd'
+process = Popen('python %s --indir %s' %(exec_path, data_path), shell=True)
+
+# Launch the simple HTTP server (Front End) as the main process
+run_Explorer_GUI()

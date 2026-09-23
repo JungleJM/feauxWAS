@@ -1,0 +1,92 @@
+#!/usr/bin/env python
+
+import argparse
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="PubMed Query Tool")
+
+    parser.add_argument('--outdir', required=True, type=str, help='Path to output directory')
+    parser.add_argument('--umls', required=False, type=str, help='Path to UMLS Metathesaurus (MRCONSO.RRF)')
+    parser.add_argument('--custom_terms', required=False, default=None, type=str,help='File containing custom search terms (Should be TXT or CSV)')
+
+    args = parser.parse_args()
+    return args
+
+
+args = parse_args()
+
+"""
+Print Start Message
+"""
+from pyPheWAS.pyPhewasCorev2 import print_start_msg, display_kwargs
+from pyPheWAS.PubMedFunctions import *
+from pathlib import Path
+import time
+import math
+
+start = time.time()
+print_start_msg()
+print('\nPubMedQuery: PubMed Search Tool\n')
+
+"""
+Retrieve and validate all arguments.
+"""
+
+kwargs = {'outdir': Path(args.outdir),
+          'umls':args.umls,
+		  'custom_terms':args.custom_terms,
+          }
+
+# Assert valid argument combination
+assert (kwargs['custom_terms'] is not None) | (kwargs['umls'] is not None), "Please provide either the 'umls' or 'custom_terms' arguments"
+assert (kwargs['custom_terms'] is not None) != (kwargs['umls'] is not None), "Both 'umls' and 'custom_terms' specified; please only provide one of these arguments"
+
+# Assert that valid files/paths were given
+if kwargs['umls']  is not None:
+    assert kwargs['umls'].endswith('.RRF'), "%s is not a valid UMLS file, must be a .RRF file" % kwargs['umls']
+    kwargs['umls'] = Path(kwargs['umls'])
+    assert kwargs['umls'].exists(), "%s does not exist" % kwargs['umls']
+
+if kwargs['custom_terms']  is not None:
+    assert kwargs['custom_terms'].endswith(('.txt', '.csv')), "%s is not a valid custom search term file, must be a .txt or .csv file" % kwargs['custom_terms']
+    kwargs['custom_terms'] = Path(kwargs['custom_terms'])
+    assert kwargs['custom_terms'].exists(), "%s does not exist" % kwargs['custom_terms']
+
+# Print Arguments
+display_kwargs(kwargs)
+# Make all arguments local variables
+locals().update(kwargs)
+
+""" Setup: Make outdir """
+outdir.mkdir(parents=True, exist_ok=True)
+
+"""
+Run PubMed Search
+"""
+if kwargs['custom_terms']  is not None:
+    print('Running PubMed Search on provided dx search terms')
+    print('Loading provided search terms')
+    search_terms = load_search_terms(custom_terms)
+    run_Custom_PubMed_Query(search_terms, outdir)
+else:
+    print('Running PubMed Search on all PheCodes')
+    print('Loading UMLS Metathesaurus (This could take a while...)')
+    umls_df = load_umls(umls)
+    run_PheWAS_PubMed_Query(umls_df, outdir)
+
+"""
+Calculate runtime
+"""
+interval = time.time() - start
+hour = math.floor(interval/3600.0)
+minute = math.floor((interval - hour*3600)/60)
+second = math.floor(interval - hour*3600 - minute*60)
+
+if hour > 0:
+    time_str = '%dh:%dm:%ds' %(hour,minute,second)
+elif minute > 0:
+    time_str = '%dm:%ds' % (minute, second)
+else:
+    time_str = '%ds' % second
+
+print('PubMedQuery Complete [Runtime: %s]' %time_str)

@@ -1,0 +1,192 @@
+#!/usr/bin/env python
+
+import argparse
+
+parser = argparse.ArgumentParser(description='pyPheWAS Explorer server')
+parser.add_argument('--indir', required=False, default='.', type=str, help='Input directory for pyPheWAS analysis')
+args = parser.parse_args()
+
+
+# for dev mode, run before calling this script:
+# export FLASK_ENV=development
+
+# constants
+BIN_REG = 0
+COUNT_REG = 1
+DUR_REG = 2
+reg_key = {BIN_REG : 'binary',
+		   COUNT_REG : 'count',
+		   DUR_REG : 'duration'}
+
+"""
+Get arguments
+"""
+import sys
+import flask
+from flask import Flask
+from flask_cors import CORS
+import numpy as np
+import pandas as pd
+from pyPheWAS.pyPhewasExplorerCore import *
+import scipy.stats
+from pathlib import Path
+
+data_path = Path(args.indir).resolve()
+
+group_f = data_path / "group.csv"
+icd_f = data_path / "icds.csv"
+bin_fm_f = data_path / "binary_feature_matrix.csv"
+cnt_fm_f = data_path / "count_feature_matrix.csv"
+dur_fm_f = data_path / "duration_feature_matrix.csv"
+FMs_exist = bin_fm_f.exists() & cnt_fm_f.exists() & dur_fm_f.exists()
+
+"""
+Set everything up
+"""
+try:
+	# load group data
+	group_data = get_group_file(group_f)
+	if not 'id' in group_data.columns:
+		raise Exception("Group file (%s) does not contain a subject identifier column ('id')" % group_f)
+	
+	response_options, gvars = process_group_vars(group_data)
+	init_response = response_options[0]
+
+	if FMs_exist:
+		print('Loading binary feature matrix')
+		fm_bin = np.loadtxt(data_path/'binary_feature_matrix.csv', delimiter=',')
+		print('Loading count feature matrix')
+		fm_cnt = np.loadtxt(data_path/'count_feature_matrix.csv', delimiter=',')
+		print('Loading duration feature matrix')
+		fm_dur = np.loadtxt(data_path/'duration_feature_matrix.csv', delimiter=',')
+		sub_count = [group_data.shape[0], group_data.shape[0], group_data.shape[0]]
+		assert [fm_bin.shape[0],fm_cnt.shape[0],fm_dur.shape[0]] == sub_count, "Feature matrices and group data do not contain the same number of subjects. Please delete the feature matrices and restart the Explorer"
+	else:
+		print('Building Feature Matrices')
+		pheno = get_icd_codes(icd_f)
+		fm_bin, fm_cnt, fm_dur, columns = generate_feature_matrix(group_data, pheno)
+		print('Saving feature matrices')
+		h = ','.join(columns)
+		np.savetxt(data_path/'binary_feature_matrix.csv', fm_bin, delimiter=',', header=h)
+		print('...')
+		np.savetxt(data_path/'count_feature_matrix.csv', fm_cnt, delimiter=',', header=h)
+		print('...')
+		np.savetxt(data_path/'duration_feature_matrix.csv', fm_dur, delimiter=',', header=h)
+		print('...')
+
+except Exception as e:
+	print('\nERROR encountered while setting up pyPheWAS Explorer')
+	print(e.args[0])
+	print('----')
+	print('Please press Ctrl+C to quit')
+	sys.exit()
+
+print("pyPheWAS Explorer Ready")
+print("Please open http://localhost:8000/ in a web brower (preferably Google Chrome)")
+print("---\n\n\n")
+
+"""
+create Flask app
+"""
+app = Flask(__name__)
+CORS(app)
+
+@app.route('/grab_data', methods=['GET','POST'])
+def get_signals():
+	# get data from the client
+	client_data = flask.request.json
+	command = client_data['cmd']
+
+	if command == "init_response": # this is only run for the INITAL response variable
+		msg = pd.DataFrame(columns=['msg'], data=[init_response])
+		data_obj = msg.to_json(orient='records')
+
+	elif command == "init_groupvars": # this is only run for the INITAL response variable
+		msg = pd.DataFrame(columns=['msg'], data=gvars)
+		data_obj = msg.to_json(orient='records')
+
+	elif command == "group_data":
+		response = init_response if (r := client_data['response']) == "INIT" else r
+		var_df = pd.DataFrame(columns=['var','corr','pval','g0','g1','ropt'], index=range(len(gvars)))
+		x = group_data[response].values
+		n_response1 = sum(x)
+		n_response0 = group_data.shape[0] - n_response1
+		for ix, gv in enumerate(gvars):
+			y = group_data[gv].values
+			[corr, pval] = scipy.stats.spearmanr(x, y)
+			data = [gv, corr, pval, 
+					n_response0, n_response1,
+					gv in response_options
+					]
+			var_df.loc[ix] = data
+		data_obj = var_df.to_json(orient='records')
+
+	elif command == "histograms":
+		response = init_response if (r := client_data['response']) == "INIT" else r
+		to_concat = []
+		mask0 = group_data[response] == 0
+		for g in gvars:
+			print(g)
+			h_g = get_1D_histogram(group_data, mask0, g)
+			to_concat.append(h_g)
+		h = pd.concat(to_concat, sort=False, ignore_index=True)
+		data_obj = h.to_json(orient='records')
+
+	elif command == "compute_hist2D":
+		var1 = client_data["var1"]
+		var2 = client_data["var2"]
+		response = client_data['response']
+		if var1 == '':
+			msg = pd.DataFrame(columns=['msg'])
+			msg.loc[0, 'msg'] = "no_data"
+			data_obj = msg.to_json(orient='records')
+		elif var1 == var2:
+			msg = pd.DataFrame(columns=['msg'])
+			msg.loc[0, 'msg'] = "select_2nd_var"
+			data_obj = msg.to_json(orient='records')
+		else:
+			h = get_2D_histogram(group_data, var1, var2, response)
+			data_obj = h.to_json(orient='records')
+
+	elif command == "independence_tests":
+		var1 = client_data["var1"]
+		var2 = client_data["var2"]
+		response = client_data['response']
+		if var1 == '':
+			msg = pd.DataFrame(columns=['msg'])
+			msg.loc[0,'msg'] = "no_data"
+			data_obj = msg.to_json(orient='records')
+		elif var1 == var2:
+			msg = pd.DataFrame(columns=['msg'])
+			msg.loc[0, 'msg'] = "select_2nd_var"
+			data_obj = msg.to_json(orient='records')
+		else:
+			stats = variable_comparison(group_data, var1, var2, response)
+			data_obj = stats.to_json(orient='records')
+
+	elif command == "run_reg":
+		reg_type = int(client_data['rtype'])
+		if reg_type == -1:
+			# init - don't do anything
+			msg = pd.DataFrame(columns=['msg'])
+			msg.loc[0,'msg'] = "no_data"
+			data_obj = msg.to_json(orient='records')
+		else:
+			# build & send regressions to notebook
+			save_cov_data = bool(client_data['save_cov'])
+			if reg_type == BIN_REG:
+				regressions = run_phewas(fm_bin, group_data, client_data['model_str'], reg_key[BIN_REG], save_cov=save_cov_data, outpath=data_path)
+			elif reg_type == COUNT_REG:
+				regressions = run_phewas(fm_cnt, group_data, client_data['model_str'], reg_key[COUNT_REG], save_cov=save_cov_data, outpath=data_path)
+			elif reg_type == DUR_REG:
+				regressions = run_phewas(fm_dur, group_data, client_data['model_str'], reg_key[DUR_REG], save_cov=save_cov_data, outpath=data_path)
+			data_obj = regressions.to_json(orient='records')
+	else:
+		data_obj = "ERROR Unknown command %s" % command
+
+	return flask.jsonify(data_obj)
+
+
+# execute the application (by default, it should be hosted at localhost:5000, which you will see in the output)
+if __name__ == '__main__':
+	app.run()

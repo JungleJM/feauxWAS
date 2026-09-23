@@ -221,18 +221,25 @@ if __name__ == "__main__":
 def collect(args):
     entries, excluded = [], []
     exts = {"." + e.strip().lower().lstrip(".") for e in args.exclude_ext.split(",") if e.strip()}
+    skip_abs = {os.path.abspath(d) for d in args.exclude_dir}
+    skip_files = {os.path.abspath(f) for f in args.exclude_file}
+    out_abs = os.path.abspath(args.out)
     for f in args.file:
         entries.append((os.path.basename(f), f))
     for spec in args.dir:
         src, _, prefix = spec.partition("=")
         prefix = (prefix or os.path.basename(os.path.normpath(src))).strip("/\\")
         for root, dirs, fnames in os.walk(src):
-            dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS)
+            dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS
+                             and os.path.abspath(os.path.join(root, d)) not in skip_abs)
             for fn in sorted(fnames):
                 full = os.path.join(root, fn)
+                if os.path.abspath(full) == out_abs:
+                    continue            # never pack the bundle into itself
                 rel = os.path.relpath(full, src).replace(os.sep, "/")
                 arc = prefix + "/" + rel
-                if os.path.splitext(fn)[1].lower() in exts or fn.endswith(".pyc"):
+                if (os.path.splitext(fn)[1].lower() in exts or fn.endswith(".pyc")
+                        or os.path.abspath(full) in skip_files):
                     excluded.append(arc)
                     continue
                 entries.append((arc, full))
@@ -247,6 +254,10 @@ def main():
     ap.add_argument("--dir", action="append", default=[],
                     help="folder to include, SRC or SRC=PREFIX")
     ap.add_argument("--exclude-ext", default="png,jpg,jpeg,gif,bmp,ico,svg,webp,tif,tiff")
+    ap.add_argument("--exclude-dir", action="append", default=[],
+                    help="folder to leave out, as a path (repeatable), e.g. --exclude-dir bundling")
+    ap.add_argument("--exclude-file", action="append", default=[],
+                    help="single file to leave out, as a path (repeatable), e.g. --exclude-file README.md")
     ap.add_argument("--note", default="")
     ap.add_argument("--check-deps", default="",
                     help="comma-separated modules that 'check' should try to import")

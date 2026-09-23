@@ -1,0 +1,156 @@
+#!/usr/bin/env python
+
+import argparse
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="pyPheWAS Mass PheCode Regression Tool")
+
+    parser.add_argument('--feature_matrix', required=True, type=str, help='Name of the feature matrix file (e.g. feature_matrix_group.csv)')
+    parser.add_argument('--group', required=True, type=str, help ='Name of the group file (e.g. groups.csv)')
+    parser.add_argument('--reg_type', required=True, type=str, help='Type of regression that you would like to use (log, lin, or dur)')
+    parser.add_argument('--path', required=False, default='.', type=str,help='Path to all input files and destination of output files')
+    parser.add_argument('--outfile', required=False, default=None, type=str,help='Name of the output file for the regression results')
+    parser.add_argument('--covariates', required=False, default='', type=str, help='Variables to be used as covariates')
+    parser.add_argument('--target', required=False, default='genotype', type=str, help='Binary variable that indicates case/control groups (default: genotype)')
+    parser.add_argument('--canonical', required=False, default="True", type=str, help='Use target as a predictor [True, default] or the dependent variable [False] in the PheWAS equation')
+    parser.add_argument('--phewas_cov', required=False, default=None, type=str, help='PheCode to use as a covariate in regression')
+    parser.add_argument('--reg_thresh', required=False, default=5, type=int, help='Threshold of subjects presenting a PheCode required for running regression (default: 5)')
+
+    args = parser.parse_args()
+    return args
+
+
+args = parse_args() # doing this first reduces help message time
+
+"""
+Import and Print Start Message
+"""
+import time
+import math
+from pathlib import Path
+import os.path as osp
+from pyPheWAS.pyPhewasCorev2 import *
+
+start = time.time()
+print_start_msg()
+print('\npyPhewasModel: Mass PheCode Regression Tool\n')
+
+
+"""
+Retrieve and validate all arguments.
+"""
+kwargs = {'path': Path(args.path),
+		  'feature_matrix': args.feature_matrix,
+		  'group': args.group,
+          'reg_type':args.reg_type,
+          'covariates':args.covariates,
+		  'phewas_cov':args.phewas_cov,
+          'target':args.target,
+          'canonical': args.canonical,
+          'reg_thresh':args.reg_thresh,
+          'outfile':args.outfile
+}
+
+# Assert that a valid regression type was used
+assert args.reg_type in regression_map.keys(), "%s is not a valid regression type" % args.reg_type
+assert (kwargs['phewas_cov'] is None) or (kwargs['phewas_cov'] in phewas_codes['PheCode'].values), "phewas_cov input (%s) is not a valid PheCode" % kwargs['phewas_cov']
+
+# Assert that valid file types were given
+assert kwargs['feature_matrix'].endswith('.csv'), "%s is not a valid feature matrix file, must be a .csv file" % (kwargs['feature_matrix'])
+assert kwargs['group'].endswith('.csv'), "%s is not a valid group file, must be a .csv file" % (kwargs['group'])
+# Assert that valid files were given
+assert osp.exists(kwargs['path'] / ('agg_measures_' + kwargs['feature_matrix'])), "%s does not exist" %(kwargs['path'] / kwargs['feature_matrix'])
+assert osp.exists(kwargs['path'] / kwargs['group']), "%s does not exist" %(kwargs['path'] / kwargs['group'])
+
+# Assign the output file if none was assigned
+if kwargs['outfile'] is None:
+    kwargs['outfile'] = "regressions_" + kwargs['group']
+# Assert that the output file is valid
+assert kwargs['outfile'].endswith('.csv'), "%s is not a valid outputfile, must be a .csv file" % (kwargs['outfile'])
+
+assert kwargs['canonical'] in ["True", "False"], "%s is not a valid canonical value (True or False)" % kwargs['canonical']
+kwargs['canonical'] = eval(kwargs['canonical'])
+
+# Print Arguments
+display_kwargs(kwargs)
+
+# Make all arguments local variables
+locals().update(kwargs)
+
+
+"""
+Load Data
+"""
+print("Retrieving group data.")
+genotypes = get_group_file(path, group)
+
+# check target variable
+assert target in genotypes.columns, "target %s is not a column in the group file" % target
+
+# check covariates
+if covariates != '':
+    for cov in covariates.replace(" ", "").split('+'):
+        if cov == MAX_AGE_AT_ICD:
+            assert cov not in genotypes.columns, "%s is a reserved covariate name; please rename this column in the group file" % cov
+        elif cov in RESERVED_COL_NAMES:
+            assert False, "%s is a reserved covariate name [%s]; please remove from the covariate list and/or rename this column in the group file" % (cov, ','.join(RESERVED_COL_NAMES))
+        else:
+            assert cov in genotypes.columns, "covariate %s is not a column in the group file" % cov
+
+print('Loading feature matrices.')
+
+a = np.loadtxt(path / ('agg_measures_' + feature_matrix), delimiter=',')
+
+if 'MaxAgeAtICD' in covariates:
+    assert osp.exists(kwargs['path'] / ('icd_age_' + kwargs['feature_matrix'])), "%s does not exist" % (kwargs['path'] / ('icd_age_' + kwargs['feature_matrix']))
+    b = np.loadtxt(path / ('icd_age_' + feature_matrix), delimiter=',')
+else:
+    b = np.zeros_like(a)
+
+if phewas_cov is not None:
+    assert osp.exists(kwargs['path'] / ('phewas_cov_' + kwargs['feature_matrix'])), "%s does not exist" % (kwargs['path'] / ('phewas_cov_' + kwargs['feature_matrix']))
+    c = np.loadtxt(path / ('phewas_cov_' + feature_matrix), delimiter=',')
+else:
+    c = np.zeros_like(a)
+    
+# reconstruct full feature matrix
+fm = np.array([a,b,c])
+
+
+"""
+Run Regressions
+"""
+print("Running PheWAS regressions...")
+regressions, model_str = run_phewas(fm, genotypes, 'ICD', regression_map[reg_type], 
+                    covariates=covariates, target=target, 
+                    phe_thresh=reg_thresh, canonical=canonical)
+
+
+print("Saving regression data to %s" % (path / outfile))
+if phewas_cov is not None:
+    model_str = model_str.replace('phewas_cov', f'phewas_cov_{phewas_cov}')
+    
+header = ','.join(['model_equation', model_str, 'group', group, 'feature_matrix', feature_matrix, 'reg_type', reg_type, 'code_type', 'ICD']) + '\n' 
+f = open(path / outfile, 'w')
+f.write(header)
+regressions.to_csv(f,index=False)
+f.close()
+
+
+"""
+Calculate runtime
+"""
+
+interval = time.time() - start
+hour = math.floor(interval/3600.0)
+minute = math.floor((interval - hour*3600)/60)
+second = math.floor(interval - hour*3600 - minute*60)
+
+if hour > 0:
+    time_str = '%dh:%dm:%ds' %(hour,minute,second)
+elif minute > 0:
+    time_str = '%dm:%ds' % (minute, second)
+else:
+    time_str = '%ds' % second
+
+print('pyPhewasModel Complete [Runtime: %s]' %time_str)
