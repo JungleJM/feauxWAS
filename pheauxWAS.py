@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-phewas.py -- single-file phenome-wide association study (PheWAS) tool.
+pheauxWAS -- single-file phenome-wide association study (PheWAS) tool.
 
 Requirements: Python 3.7+ and numpy. Nothing else (no pandas, scipy,
 statsmodels or matplotlib). Modeled on the workflow of the R PheWAS package
@@ -27,9 +27,9 @@ statsmodels or matplotlib). Modeled on the workflow of the R PheWAS package
 
 QUICK START (Windows cmd uses ^ for line continuation, PowerShell uses `)
 
-  python phewas.py --selftest
+  python pheauxWAS.py --selftest
 
-  python phewas.py ^
+  python pheauxWAS.py ^
       --people cohort.csv --id-col person_id ^
       --predictors rs1333049 --covars age sex PC1 PC2 PC3 --sex-col sex ^
       --events icd_codes.csv ^
@@ -58,7 +58,16 @@ INPUT FILES  (CSV / TSV / pipe-delimited, optionally .gz. Column names are
                  format (columns: code, exclusion_criteria).
 
 Use --events-are-phecodes if your events file already holds phecodes.
-Run  python phewas.py --help  for all options.
+TEST DATA AND CROSS-TOOL COMPARISON
+  python pheauxWAS.py --make-test-data test_data
+      writes one synthetic dataset (real ICD-10-CM codes, planted effects) in
+      pheauxWAS, pyPheWAS and R PheWAS formats, plus truth.csv and a README
+      with the exact commands for each tool.
+  python pheauxWAS.py --compare results_A.csv results_B.csv [--truth truth.csv]
+      lines up two or more results files (pheauxWAS, pyPheWAS, R PheWAS,
+      PheTK) by phecode and reports how closely they agree.
+
+Run  python pheauxWAS.py --help  for all options.
 """
 
 import argparse
@@ -77,7 +86,8 @@ import time
 from collections import Counter, defaultdict
 from xml.sax.saxutils import escape as xml_escape
 
-__version__ = "1.0.0"
+__PROG__ = "pheauxWAS"
+__version__ = "1.1.0"
 
 try:
     import numpy as np
@@ -160,11 +170,14 @@ def _norm_name(s):
 class Table(object):
     """Minimal delimited-file reader with forgiving column lookup."""
 
-    def __init__(self, path):
+    def __init__(self, path, skip=0):
         if not os.path.isfile(path):
             die("file not found: %s" % path)
         self.path = path
+        self.skip = skip
         with _open_text(path) as f:
+            for _ in range(skip):
+                f.readline()
             first = f.readline()
         counts = {d: first.count(d) for d in [",", "\t", "|", ";"]}
         best = max(counts, key=counts.get)
@@ -172,6 +185,8 @@ class Table(object):
 
     def __enter__(self):
         self.f = _open_text(self.path)
+        for _ in range(self.skip):
+            self.f.readline()
         self.reader = csv.reader(self.f, delimiter=self.delim)
         try:
             self.header = [h.strip() for h in next(self.reader)]
@@ -920,7 +935,8 @@ def write_manhattan(path, rows, title, alpha, n_labels):
 # --------------------------------------------------------------------------
 def build_parser():
     ap = argparse.ArgumentParser(
-        description="Single-file PheWAS (numpy only). See the header of this "
+        prog=__PROG__,
+        description="pheauxWAS: single-file PheWAS (numpy only). See the header of this "
                     "file for input formats and an example.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     g = ap.add_argument_group("study population")
@@ -974,9 +990,19 @@ def build_parser():
                    help="number of top hits labelled on the plot")
     g.add_argument("--no-hash", action="store_true",
                    help="skip SHA-256 hashing of input files in the log")
+    g = ap.add_argument_group("test data and comparison")
+    g.add_argument("--make-test-data", metavar="FOLDER",
+                   help="write a synthetic dataset for pheauxWAS, pyPheWAS and R PheWAS")
+    g.add_argument("--test-n", type=int, default=20000, help="people in the test data")
+    g.add_argument("--test-seed", type=int, default=2024, help="random seed for the test data")
+    g.add_argument("--compare", nargs="+", metavar="RESULTS",
+                   help="compare two or more results files (first is the reference)")
+    g.add_argument("--compare-predictor",
+                   help="predictor to use from results files that hold several")
+    g.add_argument("--truth", help="truth.csv from --make-test-data, for --compare")
     ap.add_argument("--selftest", action="store_true",
                     help="run built-in tests on synthetic data and exit")
-    ap.add_argument("--version", action="version", version=__version__)
+    ap.add_argument("--version", action="version", version="%s %s" % (__PROG__, __version__))
     return ap
 
 
@@ -1000,8 +1026,8 @@ def run(args):
     out_dir = os.path.dirname(os.path.abspath(args.out))
     os.makedirs(out_dir, exist_ok=True)
 
-    log("phewas.py %s | Python %s | numpy %s | %s"
-        % (__version__, platform.python_version(), np.__version__, platform.platform()))
+    log("%s %s | Python %s | numpy %s | %s"
+        % (__PROG__, __version__, platform.python_version(), np.__version__, platform.platform()))
     try:
         log("script sha256: %s" % sha256_file(os.path.abspath(__file__)))
     except (OSError, NameError):
@@ -1197,7 +1223,7 @@ def run(args):
                    r["description"][:60]))
         safe = re.sub(r"[^A-Za-z0-9_.-]", "_", pred)
         svg = "%s_%s_manhattan.svg" % (args.out, safe)
-        write_manhattan(svg, tested, "PheWAS: %s  (%d phecodes)" % (pred, len(tested)),
+        write_manhattan(svg, tested, __PROG__ + ": %s  (%d phecodes)" % (pred, len(tested)),
                         args.alpha, args.labels)
         log("wrote %s" % svg)
         all_rows += rows
@@ -1232,6 +1258,438 @@ def run(args):
     with open(log_path, "w", encoding="utf-8") as f:
         f.write("\n".join(_LOG_LINES) + "\n")
     return all_rows
+
+
+# --------------------------------------------------------------------------
+# synthetic test data for cross-tool comparison  (--make-test-data)
+# --------------------------------------------------------------------------
+# Real ICD-10-CM codes whose Phecode 1.2 mapping is identical in pyPheWAS's
+# bundled ICD-10 map and in PheTK's phecode12.csv (checked when this table was
+# built), so every tool maps them to the same phecode.
+# (icd10cm, phecode, description, category, sex, exclusion range)
+TEST_CODES = [
+    ("B18.2", "070.3", "Viral hepatitis C", "infectious diseases", "Both", "050-079.99"),
+    ("A98.1", "079", "Viral infection", "infectious diseases", "Both", "050-079.99"),
+    ("C18.9", "153.2", "Colon cancer", "neoplasms", "Both", "150-159.99, 208-208.99"),
+    ("C43.9", "172.11", "Melanomas of skin", "neoplasms", "Both", "172-173.99"),
+    ("C61", "185", "Cancer of prostate", "neoplasms", "Male", "185-187.99, 796-796.99, 600-602.99"),
+    ("E03.9", "244.4", "Hypothyroidism NOS", "endocrine/metabolic", "Both", "240-246.99"),
+    ("E10.9", "250.1", "Type 1 diabetes", "endocrine/metabolic", "Both", "249-250.99"),
+    ("E11.9", "250.2", "Type 2 diabetes", "endocrine/metabolic", "Both", "249-250.99"),
+    ("E78.5", "272.1", "Hyperlipidemia", "endocrine/metabolic", "Both", "272-272.99"),
+    ("M10.9", "274.1", "Gout", "endocrine/metabolic", "Both", "274-274.99"),
+    ("E66.9", "278.1", "Obesity", "endocrine/metabolic", "Both", "278-278.99"),
+    ("D50.9", "280.1", "Iron deficiency anemias, unspecified or not due to blood loss",
+     "hematopoietic", "Both", "280-285.99"),
+    ("D51.0", "281.11", "Pernicious anemia", "hematopoietic", "Both", "280-285.99"),
+    ("F41.1", "300.11", "Generalized anxiety disorder", "mental disorders", "Both", "295-306.99"),
+    ("F48.1", "303.1", "Dissociative disorder", "mental disorders", "Both", "295-306.99"),
+    ("A87.9", "320", "Meningitis", "neurological", "Both", "320-326.9"),
+    ("G20", "332", "Parkinson's disease", "neurological", "Both", "330-337.99, 341-349.99"),
+    ("G80.4", "343", "Infantile cerebral palsy", "neurological", "Both", "330-337.99, 341-349.99"),
+    ("H40.9", "365", "Glaucoma", "sense organs", "Both", "360-365.99"),
+    ("H25.9", "366.2", "Senile cataract", "sense organs", "Both", "366-366.99"),
+    ("I10", "401.1", "Essential hypertension", "circulatory system", "Both", "401-405.99"),
+    ("I25.3", "411.41", "Aneurysm and dissection of heart", "circulatory system", "Both", "410-414.99"),
+    ("I86.0", "454", "Varicose veins", "circulatory system", "Both", "450-457.99"),
+    ("R07.0", "478", "Throat pain", "respiratory", "Both", "470-479.99"),
+    ("J44.9", "496", "Chronic airway obstruction", "respiratory", "Both", "490-498.99"),
+    ("K21.9", "530.11", "GERD", "digestive", "Both", "530-530.99, 532-532.99"),
+    ("Z93.2", "559", "Ileostomy status", "digestive", "Both", "555-564.99"),
+    ("N39.0", "591", "Urinary tract infection", "genitourinary", "Both", "590-593.99"),
+    ("N80.0", "615", "Endometriosis", "genitourinary", "Female", "614-616.99"),
+    ("N92.0", "626.12", "Excessive or frequent menstruation", "genitourinary", "Female", "626-628.99"),
+    ("P36.5", "657", "Infections specific to the perinatal period", "pregnancy complications",
+     "Both", "657-657.99"),
+    ("O92.4", "676", "Other disorders of the breast associated with childbirth and disorders "
+     "of lactation", "pregnancy complications", "Female", "670-677.99"),
+    ("L12.1", "695.22", "Pemphigus and pemphigoid", "dermatologic", "Both", "690-697.99"),
+    ("L40.0", "696.41", "Psoriasis vulgaris", "dermatologic", "Both", "690-697.99, 714-714.99"),
+    ("M06.9", "714.1", "Rheumatoid arthritis", "musculoskeletal", "Both", "714-716.00, 696-696.99"),
+    ("M21.4", "735.1", "Flat foot", "musculoskeletal", "Both", "735-739.99"),
+    ("Q20.8", "747.11", "Cardiac shunt/ heart septal defect", "congenital anomalies", "Both", "747-747.99"),
+    ("Q87.5", "759", "Other and unspecified congenital anomalies", "congenital anomalies",
+     "Both", "756-759.99"),
+    ("R78.3", "790", "Nonspecific findings on examination of blood", "symptoms", "Both", "790-790.99"),
+    ("R57.0", "797.1", "Cardiogenic shock", "symptoms", "Both", "797-797.99"),
+    ("T87.4", "874", "Complication of amputation stump", "injuries & poisonings", "Both", "870-879.99"),
+    ("T53.1", "987", "Toxic effect of other gases, fumes, or vapors", "injuries & poisonings",
+     "Both", "981-989.99"),
+]
+# true log odds ratio per copy-carrier status (carrier = at least one allele)
+TEST_PLANTED = {"250.2": 0.60, "401.1": 0.35, "185": 0.90, "496": -0.50}
+
+TEST_README = r"""pheauxWAS synthetic test dataset
+================================
+Generated by {prog} {version} on {created}
+  people: {n}   seed: {seed}   events: {n_events}
+  planted effects (log OR for 'carrier'): {planted}
+  see truth.csv for every phecode's true effect (0 = no effect)
+
+Every tool gets the SAME people, the SAME real ICD-10-CM codes and the SAME
+exposure ('carrier' = 1 if the person has at least one copy of the allele).
+The data also contain things that the tools handle differently on purpose:
+  * ~3% of people have a single, one-off code for a condition. R PheWAS and
+    pheauxWAS (default) need 2 distinct dates to call a case and exclude these
+    people; pyPheWAS counts them as cases.
+  * type 1 and type 2 diabetes share an exclusion range, so people with only
+    type 1 diabetes are excluded from the type 2 diabetes controls in R PheWAS
+    and pheauxWAS, but not in pyPheWAS.
+  * a few people have a sex-specific code recorded for the wrong sex. R PheWAS
+    and pheauxWAS drop them; pyPheWAS keeps them.
+
+Run the commands below from THIS folder. {script_note}
+
+1) pheauxWAS, standard settings (comparable to R PheWAS)
+   python "{script}" --people pheauxwas/people.csv --predictors carrier --covars age sex --sex-col sex --events pheauxwas/events.csv --map pheauxwas/map_icd10cm_testcodes.csv --definitions pheauxwas/definitions_testcodes.csv --out results/pheauxwas_standard
+
+2) pheauxWAS in pyPheWAS mode (same case/control rules as pyPheWAS), run on
+   the pyPheWAS-format files
+   python "{script}" --people pyphewas/group.csv --id-col id --predictors genotype --covars AGE SEX --events pyphewas/icds.csv --code-col ICD_CODE --vocab-col ICD_TYPE --map pheauxwas/map_icd10cm_testcodes.csv --min-code-count 1 --no-exclusions --no-rollup --no-sex-restriction --min-cases 6 --firth never --out results/pheauxwas_pyphewas_mode
+
+3) pyPheWAS (replace <PYPHEWAS_DIR> with the folder that contains pyPheWAS's
+   'bin' and 'pyPheWAS' folders, e.g. the unpacked bundle)
+   Windows cmd:  set PYTHONPATH=<PYPHEWAS_DIR>
+   Mac/Linux:    export PYTHONPATH=<PYPHEWAS_DIR>
+   python <PYPHEWAS_DIR>/bin/pyPhewasPipeline --phenotype icds.csv --group group.csv --reg_type log --covariates AGE+SEX --path pyphewas --postfix test
+   -> writes pyphewas/regressions_test.csv (and plots)
+
+4) R PheWAS
+   cd R
+   Rscript run_R_PheWAS.R
+   cd ..
+   -> writes R/R_results.csv  (see the note at the top of run_R_PheWAS.R if the
+      PheWAS package is not installed)
+
+5) Compare
+   python "{script}" --compare results/pheauxwas_pyphewas_mode_results.csv pyphewas/regressions_test.csv --compare-predictor genotype --truth truth.csv --out results/compare_vs_pyphewas
+   python "{script}" --compare results/pheauxwas_standard_results.csv R/R_results.csv --compare-predictor carrier --truth truth.csv --out results/compare_vs_R
+
+What to expect
+  * 2 vs 3: same phecodes, betas within ~0.01. pyPheWAS fits an L1-penalized
+    logistic regression (statsmodels fit_regularized, alpha=0.1), so it is
+    slightly shrunk toward 0; the rest of the pipeline is equivalent.
+  * 1 vs 4: close agreement on the phecodes both report. R uses its own
+    built-in maps, which also roll codes up into parent phecodes (e.g. 250,
+    401), so R reports extra phecodes that pheauxWAS will show as 'only in R'
+    unless you run pheauxWAS with the full official map and definitions.
+  * 1 vs 2: same data, different case/control rules. Run 1 lands closer to
+    the true effects in truth.csv; run 2 (pyPheWAS rules) is pulled toward 0
+    because one-off codes are counted as cases. That is the reason R PheWAS
+    requires two codes.
+  * every tool should find the planted phecodes in truth.csv; the rest are
+    null, so they should be non-significant apart from chance.
+"""
+
+
+def make_test_data(folder, n=20000, seed=2024):
+    import datetime
+    if n < 500:
+        die("--test-n must be at least 500")
+    rs = np.random.RandomState(seed)
+    sub = {k: os.path.join(folder, k) for k in ("pheauxwas", "pyphewas", "R", "results")}
+    for d in sub.values():
+        os.makedirs(d, exist_ok=True)
+    end = datetime.date(2025, 12, 31)
+    is_male = rs.uniform(size=n) < 0.5
+    age = np.round(rs.uniform(30, 85, n), 1)
+    snp = rs.binomial(2, 0.3, n)
+    carrier = (snp > 0).astype(int)
+    ids = np.arange(1, n + 1)
+    events = []      # (id index, icd code, days before study end)
+
+    def add_visits(i, code, k):
+        span = int(min(3650, max(age[i] - 18, 1) * 365.25))
+        k = min(k, span)
+        for off in rs.choice(span, size=k, replace=False):
+            events.append((i, code, int(off)))
+
+    for icd, phe, desc, cat, sex, excl in TEST_CODES:
+        base = rs.uniform(0.02, 0.10)
+        eta = (math.log(base / (1 - base)) + 0.03 * (age - 55) + 0.2 * is_male
+               + TEST_PLANTED.get(phe, 0.0) * carrier)
+        elig = is_male if sex == "Male" else (~is_male if sex == "Female" else np.ones(n, bool))
+        has = (rs.uniform(size=n) < _expit(eta)) & elig
+        once = (rs.uniform(size=n) < 0.03) & ~has & elig
+        for i in np.where(has)[0]:
+            add_visits(i, icd, 2 + rs.randint(4))
+        for i in np.where(once)[0]:
+            add_visits(i, icd, 1)
+        if sex != "Both":                       # a few wrong-sex data errors
+            for i in rs.choice(np.where(~elig)[0], size=4, replace=False):
+                add_visits(i, icd, 2)
+    # type 1 diabetes patients sometimes also carry a type 2 code once
+    t1 = set(i for i, c, _ in events if c == "E10.9")
+    for i in list(t1)[: len(t1) // 4]:
+        add_visits(i, "E11.9", 1)
+    events.sort(key=lambda e: (e[0], -e[2], e[1]))
+
+    def w(path, header, rows):
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            wr = csv.writer(f)
+            wr.writerow(header)
+            wr.writerows(rows)
+
+    sexc = np.where(is_male, "M", "F")
+    date = lambda off: (end - datetime.timedelta(days=off)).isoformat()
+    ev_age = lambda i, off: round(age[i] - off / 365.25, 2)
+    # pheauxWAS
+    w(os.path.join(sub["pheauxwas"], "people.csv"), ["person_id", "snp", "carrier", "age", "sex"],
+      [(ids[i], snp[i], carrier[i], age[i], sexc[i]) for i in range(n)])
+    w(os.path.join(sub["pheauxwas"], "events.csv"), ["person_id", "vocabulary_id", "code", "date"],
+      [(ids[i], "ICD10CM", c, date(off)) for i, c, off in events])
+    w(os.path.join(sub["pheauxwas"], "map_icd10cm_testcodes.csv"), ["code", "vocabulary_id", "phecode"],
+      [(t[0], "ICD10CM", t[1]) for t in TEST_CODES])
+    w(os.path.join(sub["pheauxwas"], "definitions_testcodes.csv"),
+      ["phecode", "phenotype", "phecode_exclude_range", "sex", "category"],
+      [(t[1], t[2], t[5], t[4], t[3]) for t in TEST_CODES])
+    # pyPheWAS (ids sorted, events sorted by id then age)
+    w(os.path.join(sub["pyphewas"], "group.csv"), ["id", "genotype", "AGE", "SEX", "MaxAgeAtVisit"],
+      [(ids[i], carrier[i], age[i], int(is_male[i]), age[i]) for i in range(n)])
+    w(os.path.join(sub["pyphewas"], "icds.csv"), ["id", "ICD_CODE", "ICD_TYPE", "AgeAtICD"],
+      [(ids[i], c, 10, ev_age(i, off)) for i, c, off in events])
+    # R PheWAS
+    w(os.path.join(sub["R"], "icd_events.csv"), ["id", "vocabulary_id", "code", "index"],
+      [(ids[i], "ICD10CM", c, date(off)) for i, c, off in events])
+    w(os.path.join(sub["R"], "genotypes.csv"), ["id", "carrier"], [(ids[i], carrier[i]) for i in range(n)])
+    w(os.path.join(sub["R"], "covariates.csv"), ["id", "age", "sex"],
+      [(ids[i], age[i], sexc[i]) for i in range(n)])
+    w(os.path.join(sub["R"], "id_sex.csv"), ["id", "sex"], [(ids[i], sexc[i]) for i in range(n)])
+    with open(os.path.join(sub["R"], "run_R_PheWAS.R"), "w", encoding="utf-8", newline="\n") as f:
+        f.write(R_SCRIPT)
+    # truth
+    w(os.path.join(folder, "truth.csv"),
+      ["phecode", "icd10cm", "description", "sex_restriction", "true_log_or", "true_or"],
+      [(t[1], t[0], t[2], t[4], TEST_PLANTED.get(t[1], 0.0),
+        round(math.exp(TEST_PLANTED.get(t[1], 0.0)), 4)) for t in TEST_CODES])
+    try:
+        script = os.path.abspath(__file__)
+        note = "The script path below is where it was when this data was made."
+    except NameError:
+        script, note = "pheauxWAS.py", ""
+    with open(os.path.join(folder, "README.txt"), "w", encoding="utf-8") as f:
+        f.write(TEST_README.format(
+            prog=__PROG__, version=__version__, created=time.strftime("%Y-%m-%d %H:%M"),
+            n=n, seed=seed, n_events=len(events), script=script, script_note=note,
+            planted=", ".join("%s=%+.2f" % kv for kv in sorted(TEST_PLANTED.items()))))
+    log("wrote test data to %s  (%d people, %d events, %d phecodes, %d planted)"
+        % (os.path.abspath(folder), n, len(events), len(TEST_CODES), len(TEST_PLANTED)))
+    log("next: open %s for the commands to run each tool"
+        % os.path.join(os.path.abspath(folder), "README.txt"))
+
+
+R_SCRIPT = r'''# Run the R PheWAS package on the pheauxWAS synthetic test data.
+# Usage, from this folder:   Rscript run_R_PheWAS.R
+#
+# If the PheWAS package is installed, it is used directly. If it is not (for
+# example because its 'meta' dependency is missing), set the environment
+# variable PHEWAS_R_SRC to a copy of https://github.com/PheWAS/PheWAS and the
+# script will source its R/ folder and load its data/ folder instead. That
+# fallback is best-effort: it depends on the package internals and was not
+# tested by pheauxWAS.
+suppressMessages({ library(dplyr); library(tidyr) })
+src <- Sys.getenv("PHEWAS_R_SRC", "")
+if (requireNamespace("PheWAS", quietly = TRUE)) {
+  suppressMessages(library(PheWAS))
+  vmap <- PheWAS::phecode_map; rmap <- PheWAS::phecode_rollup_map; emap <- PheWAS::phecode_exclude
+} else if (nzchar(src)) {
+  suppressMessages({ library(ggplot2); library(parallel); library(MASS); library(logistf)
+                     library(lmtest); library(survival); library(ggrepel) })
+  for (f in list.files(file.path(src, "R"), pattern = "[.][Rr]$", full.names = TRUE)) source(f)
+  for (f in list.files(file.path(src, "data"), full.names = TRUE)) load(f)
+  vmap <- phecode_map; rmap <- phecode_rollup_map; emap <- phecode_exclude
+} else {
+  stop("PheWAS is not installed; set PHEWAS_R_SRC to a PheWAS source folder")
+}
+
+ev  <- read.csv("icd_events.csv", colClasses = "character")
+gen <- read.csv("genotypes.csv",  colClasses = c("character", "numeric"))
+cov <- read.csv("covariates.csv", colClasses = c("character", "numeric", "character"))
+sx  <- read.csv("id_sex.csv",     colClasses = "character")
+
+phen <- createPhenotypes(ev, min.code.count = 2, add.phecode.exclusions = TRUE,
+                         translate = TRUE, id.sex = sx, full.population.ids = gen$id,
+                         vocabulary.map = vmap, rollup.map = rmap, exclusion.map = emap)
+res <- phewas(phenotypes = phen, genotypes = gen, covariates = cov,
+              cores = 1, min.records = 20)
+write.csv(res, "R_results.csv", row.names = FALSE)
+cat("wrote R_results.csv with", nrow(res), "rows\n")
+'''
+
+
+# --------------------------------------------------------------------------
+# cross-tool comparison  (--compare)
+# --------------------------------------------------------------------------
+def read_any_results(path, predictor=None):
+    """Read pheauxWAS, pyPheWAS, R PheWAS or PheTK results; return
+    (label, {phecode: (beta, p, n_cases)}, notes)."""
+    with _open_text(path) as f:
+        first = f.readline()
+    skip = 1 if first.strip().lower().startswith("model_equation") else 0
+    notes = []
+    out = {}
+    with Table(path, skip=skip) as t:
+        pi = t.find(None, ["phecode", "PheWAS Code", "phenotype", "phewas_code"], True, "phecode")
+        bi = t.find(None, ["beta"], True, "beta")
+        qi = t.find(None, ["p", "p-val", "p_value", "pvalue", "pval"], True, "p-value")
+        ri = t.find(None, ["predictor", "snp"], False, "predictor")
+        ci = t.find(None, ["n_cases", "cases"], False, "cases")
+        cols = {_norm_name(h) for h in t.header}
+        if skip:
+            label = "pyPheWAS"
+        elif "qfdr" in cols:
+            label = "pheauxWAS"
+        elif "adjustment" in cols and "snp" in cols:
+            label = "R PheWAS"
+        elif "pvalue" in cols and "phecode" in cols:
+            label = "PheTK"
+        else:
+            label = os.path.basename(path)
+        preds = Counter()
+        n_bad = n_zero = 0
+        for row in t.rows():
+            if ri is not None:
+                pr = row[ri].strip()
+                preds[pr] += 1
+                if predictor and pr != predictor:
+                    continue
+            ph = row[pi].strip().strip('"')
+            if ph[:1] in "Xx" and ph[1:2].isdigit():
+                ph = ph[1:]
+            ph = canon_phecode(ph)
+            try:
+                b, p = float(row[bi]), float(row[qi])
+            except ValueError:
+                n_bad += 1
+                continue
+            if not (np.isfinite(b) and np.isfinite(p)):
+                n_bad += 1
+                continue
+            if p <= 0:
+                n_zero += 1
+                continue
+            cases = ""
+            if ci is not None:
+                cases = row[ci].strip()
+            if ph in out:
+                die("%s has more than one row for phecode %s; if it holds several predictors, "
+                    "choose one with --compare-predictor (found: %s)"
+                    % (path, ph, ", ".join(sorted(preds))))
+            out[ph] = (b, p, cases)
+    if predictor and ri is not None and predictor not in preds:
+        die("%s: predictor '%s' not found (found: %s)" % (path, predictor, ", ".join(sorted(preds))))
+    if n_bad:
+        notes.append("%d rows without a usable beta/p (untested phecodes)" % n_bad)
+    if n_zero:
+        notes.append("%d rows with p = 0 skipped" % n_zero)
+    return label, out, notes
+
+
+def compare_results(paths, predictor, truth_path, out_prefix, alpha=0.05):
+    if len(paths) < 2:
+        die("--compare needs at least two results files")
+    sets = []
+    for pth in paths:
+        pred = predictor
+        label, res, notes = read_any_results(pth, predictor=None)
+        if predictor is not None:
+            try:
+                label, res, notes = read_any_results(pth, predictor=pred)
+            except PheWASError:
+                label, res, notes = read_any_results(pth, predictor=None)
+        sets.append((label, pth, res, notes))
+    labels = [s[0] for s in sets]
+    seen = Counter()
+    for k, lab in enumerate(labels):
+        seen[lab] += 1
+        if seen[lab] > 1 or labels.count(lab) > 1:
+            labels[k] = "%s[%d]" % (lab, k + 1)
+    lines = []
+
+    def say(msg=""):
+        lines.append(msg)
+        log(msg)
+
+    say("%s comparison" % __PROG__)
+    for lab, (_, pth, res, notes) in zip(labels, sets):
+        say("  %-14s %4d tested phecodes  %s%s" % (lab, len(res), pth,
+                                                    ("  (" + "; ".join(notes) + ")") if notes else ""))
+    ref_lab, ref = labels[0], sets[0][2]
+    for lab, (_, _, res, _) in zip(labels[1:], sets[1:]):
+        both = sorted(set(ref) & set(res), key=phe_sort_key)
+        say("")
+        say("%s vs %s" % (ref_lab, lab))
+        say("  phecodes in both: %d   only in %s: %d   only in %s: %d"
+            % (len(both), ref_lab, len(set(ref) - set(res)), lab, len(set(res) - set(ref))))
+        if not both:
+            say("  nothing to compare: no phecodes in common (check the files use the same codes)")
+            continue
+        b1 = np.array([ref[p][0] for p in both])
+        b2 = np.array([res[p][0] for p in both])
+        l1 = -np.log10([ref[p][1] for p in both])
+        l2 = -np.log10([res[p][1] for p in both])
+        db = np.abs(b1 - b2)
+        say("  beta:      max |diff| %.4g   median |diff| %.4g   correlation %s"
+            % (db.max(), np.median(db), "%.5f" % np.corrcoef(b1, b2)[0, 1] if len(both) > 2 else "n/a"))
+        say("  -log10(p): max |diff| %.4g   correlation %s"
+            % (np.abs(l1 - l2).max(), "%.5f" % np.corrcoef(l1, l2)[0, 1] if len(both) > 2 else "n/a"))
+        say("  same direction of effect: %d of %d" % (int(np.sum(np.sign(b1) == np.sign(b2))), len(both)))
+        s1 = {p for p in ref if ref[p][1] <= alpha / len(ref)}
+        s2 = {p for p in res if res[p][1] <= alpha / len(res)}
+        say("  Bonferroni-significant: %s %s | %s %s | in both %s"
+            % (ref_lab, sorted(s1, key=phe_sort_key), lab, sorted(s2, key=phe_sort_key),
+               sorted(s1 & s2, key=phe_sort_key)))
+        worst = sorted(both, key=lambda p: -abs(ref[p][0] - res[p][0]))[:5]
+        say("  largest beta differences: " + ", ".join(
+            "%s (%.4f vs %.4f)" % (p, ref[p][0], res[p][0]) for p in worst))
+    if truth_path:
+        say("")
+        say("planted effects (truth.csv) - estimated beta [p]")
+        with Table(truth_path) as t:
+            pi = t.find(None, ["phecode"], True, "phecode")
+            ti = t.find(None, ["true_log_or"], True, "true_log_or")
+            di = t.find(None, ["description"], False, "description")
+            truth = [(canon_phecode(r[pi]), float(r[ti]), r[di] if di is not None else "")
+                     for r in t.rows()]
+        for ph, tv, desc in truth:
+            if tv == 0:
+                continue
+            cells = []
+            for lab, (_, _, res, _) in zip(labels, sets):
+                if ph in res:
+                    cells.append("%s %+.3f [%.2g]" % (lab, res[ph][0], res[ph][1]))
+                else:
+                    cells.append("%s not tested" % lab)
+            say("  %-7s true %+.2f  %s  | %s" % (ph, tv, desc[:28], " | ".join(cells)))
+        nulls = [ph for ph, tv, _ in truth if tv == 0]
+        for lab, (_, _, res, _) in zip(labels, sets):
+            tested = [p for p in nulls if p in res]
+            fp = [p for p in tested if res[p][1] <= alpha / max(len(res), 1)]
+            say("  %s: %d of %d null phecodes Bonferroni-significant %s"
+                % (lab, len(fp), len(tested), fp if fp else ""))
+    allp = sorted(set().union(*[set(s[2]) for s in sets]), key=phe_sort_key)
+    csv_path = out_prefix + "_compare.csv"
+    d = os.path.dirname(os.path.abspath(csv_path))
+    os.makedirs(d, exist_ok=True)
+    with open(csv_path, "w", encoding="utf-8", newline="") as f:
+        wr = csv.writer(f)
+        hdr = ["phecode"]
+        for lab in labels:
+            hdr += [lab + " beta", lab + " p", lab + " cases"]
+        for lab in labels[1:]:
+            hdr += ["beta diff (%s - %s)" % (lab, ref_lab)]
+        wr.writerow(hdr)
+        for ph in allp:
+            row = [ph]
+            for (_, _, res, _) in sets:
+                v = res.get(ph)
+                row += ["%.6g" % v[0], "%.4g" % v[1], v[2]] if v else ["", "", ""]
+            for (_, _, res, _) in sets[1:]:
+                row.append("%.6g" % (res[ph][0] - ref[ph][0]) if ph in res and ph in ref else "")
+            wr.writerow(row)
+    with open(out_prefix + "_compare_summary.txt", "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    log("wrote %s and %s_compare_summary.txt" % (csv_path, out_prefix))
 
 
 # --------------------------------------------------------------------------
@@ -1272,7 +1730,7 @@ def selftest():
           and np.isfinite(out["beta"]) and 0 < out["p"] < 1e-5,
           "beta=%s p=%s" % (out.get("beta"), out.get("p")))
     # 4. end-to-end pipeline on synthetic files
-    tmp = tempfile.mkdtemp(prefix="phewas_selftest_")
+    tmp = tempfile.mkdtemp(prefix="pheauxwas_selftest_")
     phes = ["008", "038", "250", "250.2", "250.21", "272", "272.1", "401",
             "401.1", "411", "411.4", "427", "427.2", "495", "555", "555.1",
             "714", "714.1", "185", "626"]
@@ -1352,6 +1810,27 @@ def selftest():
           "min null p=%.3g" % min(nulls))
     check("outputs written", os.path.isfile(os.path.join(tmp, "st_results.csv"))
           and os.path.isfile(os.path.join(tmp, "st_snp_manhattan.svg")))
+    # 5. test-data generator + comparison round trip
+    td = os.path.join(tmp, "testdata")
+    make_test_data(td, n=4000, seed=7)
+    r1 = run(build_parser().parse_args([
+        "--people", os.path.join(td, "pheauxwas", "people.csv"), "--predictors", "carrier",
+        "--covars", "age", "sex", "--sex-col", "sex",
+        "--events", os.path.join(td, "pheauxwas", "events.csv"),
+        "--map", os.path.join(td, "pheauxwas", "map_icd10cm_testcodes.csv"),
+        "--definitions", os.path.join(td, "pheauxwas", "definitions_testcodes.csv"),
+        "--out", os.path.join(td, "results", "std"), "--no-hash"]))
+    byp = {r["phecode"]: r for r in r1 if r["p"] is not None}
+    ok5 = (byp["250.2"]["p"] < 1e-4 and byp["185"]["p"] < 1e-4 and byp["496"]["p"] < 0.05
+           and byp["496"]["beta"] < 0 and byp["250.2"]["beta"] > 0)
+    check("test data: planted effects recovered with the right sign", ok5,
+          "250.2 p=%.2g, 185 p=%.2g, 496 beta=%.2f p=%.2g"
+          % (byp["250.2"]["p"], byp["185"]["p"], byp["496"]["beta"], byp["496"]["p"]))
+    ref = os.path.join(td, "results", "std_results.csv")
+    compare_results([ref, ref], "carrier", os.path.join(td, "truth.csv"),
+                    os.path.join(td, "results", "self_compare"))
+    check("compare: a file matches itself", os.path.isfile(
+        os.path.join(td, "results", "self_compare_compare.csv")))
     log("self-test files in %s" % tmp)
     log("SELF-TEST %s" % ("PASSED" if not fails else "FAILED: %s" % fails))
     return 0 if not fails else 1
@@ -1362,6 +1841,13 @@ def main(argv=None):
     try:
         if args.selftest:
             return selftest()
+        if args.make_test_data:
+            make_test_data(args.make_test_data, n=args.test_n, seed=args.test_seed)
+            return 0
+        if args.compare:
+            compare_results(args.compare, args.compare_predictor, args.truth,
+                            args.out or "comparison", alpha=args.alpha)
+            return 0
         run(args)
         return 0
     except PheWASError as e:
