@@ -1,6 +1,3 @@
-
-
-
 # PheauxWAS and pyPheWASA
 
 PheaxWAS is a single-script pheWAS python script that runs a phewas study
@@ -13,7 +10,7 @@ you need to use the function (crtl-cmd-p) "python: select interpreter" and do th
 
 Use make_bundle.py, use this command:
 
-```
+```         
 python3 bundling/make_bundle.py --out bundling/pheauxwas_bundle.py \
   --dir .=pheauxwas_build \
   --exclude-dir bundling \
@@ -22,16 +19,11 @@ python3 bundling/make_bundle.py --out bundling/pheauxwas_bundle.py \
   --check-deps numpy,pandas,scipy,statsmodels,matplotlib,tqdm \
   --pythonpath pheauxwas_build/pyPheWAS \
   --note "pheauxWAS 1.1.0 + pyPheWAS commit 2a8fff1"
-
 ```
-
 
 For file exclusion, how the path works: it's relative to the folder you run the command from. So --exclude-file README.md drops only the README in pheauxwas_build itself. I tested this: the top-level README was left out and pyPheWAS/README.md was kept.
 
-pyPheWAS's README too: add --exclude-file pyPheWAS/README.md.
-Other files: repeat --exclude-file once per file.
-Every .md file everywhere: add md to the --exclude-ext list instead.
-
+pyPheWAS's README too: add --exclude-file pyPheWAS/README.md. Other files: repeat --exclude-file once per file. Every .md file everywhere: add md to the --exclude-ext list instead.
 
 ## WHat's inside
 

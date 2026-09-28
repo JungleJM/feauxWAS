@@ -1,0 +1,12 @@
+Column,Meaning
+Patient_ID,Stable synthetic patient identifier.
+HaT_Flag,1 = known HaT case; 0 = no known HaT diagnosis.
+IndexDate,Case diagnosis date or candidate control pseudo-index date.
+IndexQuarter,Calendar quarter used for exact 3-month-period matching.
+AgeAtIndex,Patient age at index date.
+YearsBeforeIndex,Observation history before index date.
+YearsAfterIndex,Observation follow-up after index date.
+ClinicVisitCountPreIndex,Pre-index utilization proxy.
+DiagnosisEventCountPreIndex,Pre-index diagnosis density proxy.
+ProblemListCount,Comorbidity/problem-list burden proxy.
+EligibleForControlPool,Synthetic flag showing basic non-HaT control eligibility.
