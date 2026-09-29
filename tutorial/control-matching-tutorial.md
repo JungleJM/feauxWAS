@@ -16,7 +16,7 @@ This folder is a working sketch of what to collect before a HaT PheWAS. The synt
 
 Regenerate them with:
 
-```bash
+``` bash
 python3 tutorial/make_synthetic_hat_parquets.py
 ```
 
@@ -82,7 +82,7 @@ MatchIt's default `matchit()` call does 1:1 nearest-neighbor matching on a prope
 
 Install/read parquet:
 
-```r
+``` r
 install.packages(c("MatchIt", "arrow", "cobalt", "dplyr"))
 
 library(MatchIt)
@@ -102,7 +102,7 @@ cohort <- read_parquet("tutorial/synthetic_parquets/match_ready_cohort.parquet")
 
 Practical first-pass match:
 
-```r
+``` r
 m1 <- matchit(
   HaT_Flag ~ AgeAtIndex +
     YearsBeforeIndex +
@@ -150,7 +150,7 @@ MatchIt also supports Mahalanobis matching and Mahalanobis matching within prope
 
 The file `hat-control-recipe.yaml` is meant to be filled in with your real parquet paths and column names. It uses aliases so you can write `p.PatientSex` instead of a long path. The convention is:
 
-```text
+``` text
 alias.ColumnName
 ```
 
@@ -158,11 +158,11 @@ For example, if your patient parquet is aliased as `p`, and sex is stored in `Pa
 
 The wrapper should:
 
-1. Load the listed parquet aliases.
-2. Resolve every `alias.column` reference.
-3. Build a match-ready cohort.
-4. Apply eligibility filters.
-5. Export CSVs for `pheauxWAS` or run MatchIt in R.
-6. Write a matched patient parquet and a matched-pairs parquet.
+1.  Load the listed parquet aliases.
+2.  Resolve every `alias.column` reference.
+3.  Build a match-ready cohort.
+4.  Apply eligibility filters.
+5.  Export CSVs for `pheauxWAS` or run MatchIt in R.
+6.  Write a matched patient parquet and a matched-pairs parquet.
 
 Start with the synthetic paths in the YAML, then replace them with your VM parquet paths.
