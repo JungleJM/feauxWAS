@@ -8,10 +8,10 @@ This folder is a working sketch of what to collect before a HaT PheWAS. The synt
 - `non_hat_patient_pool.parquet`: patients with no known HaT diagnosis, before matching.
 - `candidate_controls_4x.parquet`, `candidate_controls_8x.parquet`, `candidate_controls_20x.parquet`, `candidate_controls_50x.parquet`: increasingly large candidate control pools sampled from eligible non-HaT patients.
 - `match_ready_cohort.parquet`: HaT cases plus eligible non-HaT controls in one table, ready for MatchIt.
-- `example_4to1_matches.parquet`: example case-control links after matching.
-- `example_4to1_matched_cohort.parquet`: the matched cohort itself.
+- `example_4to1_matches.parquet`: example case-control links from a simple greedy match (an illustration of the file shape, not MatchIt).
+- `example_4to1_matched_cohort.parquet`: the cohort from that greedy match. The real matched cohort is `matchit_4to1_matched.parquet`, written by `matchit_example.R`.
 - `index_events.parquet`: the case diagnosis date or control pseudo-index date.
-- `diagnosis_events.parquet`: fake ICD-10-CM-like events for PheWAS.
+- `diagnosis_events.parquet`: fake ICD-10-CM events for PheWAS, both before and after the index date. HaT cases also carry the real HaT code, `D89.44`.
 - `data_dictionary.csv`: short column explanations.
 
 Regenerate them with:
@@ -29,7 +29,7 @@ python3 tutorial/make_synthetic_hat_parquets.py
 - Age at index: use matching/caliper or strong covariate adjustment.
 - Observation time before index: require enough pre-index history, usually at least 1-2 years.
 - Observation time after index: require enough follow-up if post-index outcomes are included.
-- Utilization before index: clinic visits, encounter count, diagnosis count, or similar.
+- Utilization before index: clinic visits (in Cosmos, distinct dates with an outpatient face-to-face encounter). Not diagnosis count: in a pre-index PheWAS those diagnoses are the outcomes, and balancing on them removes part of the signal.
 - Race and ethnicity: adjust or balance if available and usable.
 - Diagnosis-event table: one row per ICD event, with patient ID, code, vocabulary, and date.
 - Repeat-diagnosis information: enough to require repeated diagnosis codes for case definitions and phenotypes.
@@ -37,8 +37,7 @@ python3 tutorial/make_synthetic_hat_parquets.py
 ## Good Optional Variables
 
 - Index year or index quarter: exact match on calendar time when possible.
-- Problem-list count or Charlson-like comorbidity score: general disease burden.
-- Encounter type counts: outpatient, ED, inpatient, specialty visits.
+- ED visit and hospital admission counts, kept separate from clinic visits.
 - Prior mast-cell-related diagnosis flag: useful sensitivity variable, but be careful because it may partly mediate HaT recognition.
 - Medication or lab proxies: only if available broadly enough and not caused by the exposure definition.
 - Data-source/system flag: ideal if available, but you said physical location/source details are not available.
@@ -56,7 +55,6 @@ Then use nearest-neighbor or propensity-score matching on:
 - `YearsBeforeIndex`
 - `YearsAfterIndex`
 - `ClinicVisitCountPreIndex`
-- `DiagnosisEventCountPreIndex`
 - `Race`
 - `Ethnicity`
 
@@ -74,7 +72,35 @@ Fourth, create a match-ready table with cases and candidate controls in one row-
 
 Fifth, run matching. For a first pass, match within exact sex and exact index quarter. Within those strata, find controls with similar age, observation time, and utilization. After matching, inspect balance. If age, utilization, race, or observation time are still imbalanced, tighten calipers, add exact strata, or lower the match ratio.
 
-Sixth, use the matched cohort as the population table for the PheWAS. The PheWAS still creates phecode-specific outcome cases and controls internally; the matching step only defines the fairer HaT-vs-non-HaT study population.
+Sixth, prepare the PheWAS inputs with `prepare_phewas_inputs.py` (next section).
+
+Seventh, use the matched cohort as the population table for the PheWAS. The PheWAS still creates phecode-specific outcome cases and controls internally; the matching step only defines the fairer HaT-vs-non-HaT study population.
+
+## Preparing The PheWAS Inputs
+
+pheauxWAS tests every event it is given. Two decisions must be made before the events reach it:
+
+**Remove the exposure codes.** The code that defines HaT, `D89.44`, maps to phecode `GE_969.4` "Hereditary alpha tryptasemia". If it stays in, every case has it and no control does, so it comes back as the top hit (in the synthetic data: OR ≈ 100,000, p ≈ 10⁻¹⁷⁴), along with its parent `GE_969`. It is circular and says nothing. Drop every code used to define the cases.
+
+**Choose a time window.** Each event is kept or dropped based on its date relative to the patient's index date:
+
+- `pre`: before index. These are phenotypes present before HaT was diagnosed. Use this as the primary analysis, with `--lookback-years 3` so every patient gets the same 3-year window.
+- `post`: after index. HaT patients are worked up after diagnosis, so post-index hits can be surveillance rather than biology. Use it as a sensitivity analysis.
+- `all`: every event.
+
+The index day is in neither `pre` nor `post`, since codes entered on the diagnosis day are usually part of the HaT workup.
+
+``` bash
+python3 tutorial/prepare_phewas_inputs.py \
+  --cohort tutorial/synthetic_parquets/matchit_4to1_matched.parquet \
+  --events tutorial/synthetic_parquets/diagnosis_events.parquet \
+  --window pre --lookback-years 3 \
+  --out-dir tutorial/work
+```
+
+It writes `tutorial/work/hat_people_matched.csv` and `tutorial/work/hat_diagnosis_events_pre.csv`. Run it once per window, then run pheauxWAS on each events file. The synthetic data is built so the windows differ: urticaria and fatigue are enriched before index, and after index the effects are larger and abdominal pain and anxiety join them. That is the pattern a surveillance effect would produce.
+
+**Matched sets are not used in the regression.** MatchIt writes a `subclass` column (the matched set). pheauxWAS ignores it and runs ordinary logistic regression, adjusted for the covariates, on the matched cohort. This is common and defensible, but say so in the methods. A conditional logistic regression within matched sets is the stricter alternative.
 
 ## MatchIt In R
 
@@ -108,7 +134,6 @@ m1 <- matchit(
     YearsBeforeIndex +
     YearsAfterIndex +
     log1p(ClinicVisitCountPreIndex) +
-    log1p(DiagnosisEventCountPreIndex) +
     Race +
     Ethnicity,
   data = cohort,
@@ -162,7 +187,10 @@ The wrapper should:
 2.  Resolve every `alias.column` reference.
 3.  Build a match-ready cohort.
 4.  Apply eligibility filters.
-5.  Export CSVs for `pheauxWAS` or run MatchIt in R.
+5.  Run MatchIt in R.
 6.  Write a matched patient parquet and a matched-pairs parquet.
+7.  Apply the `phewas_prep` block (drop exposure codes, pick the window) and export CSVs for `pheauxWAS`.
+
+That wrapper does not exist yet. For now, run `matchit_example.R` and `prepare_phewas_inputs.py` by hand.
 
 Start with the synthetic paths in the YAML, then replace them with your VM parquet paths.

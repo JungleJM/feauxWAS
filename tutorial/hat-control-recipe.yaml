@@ -35,10 +35,13 @@ required_columns:
   observation_end_date: p.ObservationEndDate
   years_before_index: p.YearsBeforeIndex
   years_after_index: p.YearsAfterIndex
+  # Clinic visits = distinct dates with an EncounterFact row where
+  # IsOutpatientFaceToFaceVisit = 1. This is the utilization measure.
   clinic_visits_pre_index: p.ClinicVisitCountPreIndex
   clinic_visits_post_index: p.ClinicVisitCountPostIndex
-  diagnosis_events_pre_index: p.DiagnosisEventCountPreIndex
-  problem_list_count: p.ProblemListCount
+  # Not collected: pre-index diagnosis count and problem-list count. In a
+  # pre-index PheWAS those diagnoses are the outcomes, so matching or adjusting
+  # on them removes part of the HaT signal.
 
 diagnosis_columns:
   patient_id: dx.Patient_ID
@@ -60,7 +63,7 @@ control_pool:
     minimum_years_before_index: 1.0
     minimum_years_after_index: 0.25
     minimum_clinic_visits_pre_index: 2
-    exclude_prior_hat_diagnosis: true
+    exclude_any_hat_diagnosis_ever: true  # any D89.44, any date, even a single code
   pseudo_index_date:
     strategy: match_case_calendar_distribution
     preferred_granularity: quarter
@@ -81,7 +84,6 @@ matching:
     - p.YearsBeforeIndex
     - p.YearsAfterIndex
     - log1p(p.ClinicVisitCountPreIndex)
-    - log1p(p.DiagnosisEventCountPreIndex)
     - p.Race
     - p.Ethnicity
   caliper:
@@ -97,11 +99,31 @@ outputs:
   matched_cohort: tutorial/synthetic_parquets/matchit_4to1_matched.parquet
   matched_pairs: tutorial/synthetic_parquets/matchit_4to1_pairs.parquet
   pheauxwas_people_csv: tutorial/work/hat_people_matched.csv
-  pheauxwas_events_csv: tutorial/work/hat_diagnosis_events.csv
-  pheauxwas_out_prefix: tutorial/results/hat_phewas
+  pheauxwas_events_csv: tutorial/work/hat_diagnosis_events_{window}.csv
+  pheauxwas_out_prefix: tutorial/results/hat_phewas_{window}
+
+# Done by prepare_phewas_inputs.py, between matching and the PheWAS.
+# pheauxWAS counts every event it is given, so these must be applied first.
+phewas_prep:
+  # Codes that define the exposure. D89.44 maps to phecode GE_969.4
+  # (Hereditary alpha tryptasemia); left in, it is a guaranteed top hit.
+  exclude_codes:
+    - D89.44
+  # Which events count, relative to each patient's index date. Run pre as the
+  # primary analysis and post as a sensitivity analysis: hits that appear only
+  # post-index may be diagnostic workup rather than HaT biology.
+  # The index day itself is in neither pre nor post.
+  windows:
+    - pre
+    - post
+  # pre keeps only the 3 years before index, so every patient's window is equal.
+  lookback_years: 3
 
 phewas:
   engine: pheauxWAS
+  # The matched sets (MatchIt's subclass) are not used in the regression:
+  # this is covariate-adjusted logistic regression on the matched cohort, not
+  # conditional logistic regression. State this in the methods.
   people:
     file: tutorial/work/hat_people_matched.csv
     id_col: Patient_ID
@@ -116,7 +138,7 @@ phewas:
       - ClinicVisitCountPreIndex
     sex_col: Sex
   events:
-    file: tutorial/work/hat_diagnosis_events.csv
+    file: tutorial/work/hat_diagnosis_events_{window}.csv
     id_col: Patient_ID
     code_col: DiagnosisCode
     vocab_col: Vocabulary

@@ -6,6 +6,42 @@ PheaxWAS is a single-script pheWAS python script that runs a phewas study
 
 you need to use the function (crtl-cmd-p) "python: select interpreter" and do the venv. That has numpy. Soon i'll figure out how to do global but that's later
 
+## Friend setup / dependencies
+
+Do not share the `.venv` folder itself. It is tied to your computer's paths and operating system, so it usually breaks on someone else's machine.
+
+Instead, share the project with `requirements.txt` and `setup_env.py`. After downloading the project, your friend can run:
+
+```bash
+python3 setup_env.py
+```
+
+On Windows, use:
+
+```bat
+py setup_env.py
+```
+
+That creates a fresh `.venv`, installs the Python packages in `requirements.txt`, and installs the bundled `pyPheWAS-2a8fff1` package. Then in VS Code, use "Python: Select Interpreter" and choose the `.venv` for this project.
+
+## GitHub mirror sync
+
+This repo can keep using the private Gitea remote as `origin` while also pushing a collaborator copy to a private GitHub repo.
+
+First-time setup:
+
+```bash
+python3 sync_github.py --repo git@github.com:YOUR_USER/pheauxWAS.git
+```
+
+After that, commit your work locally and run:
+
+```bash
+python3 sync_github.py
+```
+
+The script pushes the current branch to a separate `github` remote. It stops if there are uncommitted changes, because only commits can be synced.
+
 ## bundling
 
 Use make_bundle.py, use this command:

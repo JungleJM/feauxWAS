@@ -1,7 +1,7 @@
 install_if_missing <- function(pkgs) {
   missing <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)]
   if (length(missing) > 0) {
-    install.packages(missing)
+    install.packages(missing, repos = "https://cloud.r-project.org")
   }
 }
 
@@ -26,7 +26,6 @@ match <- matchit(
     YearsBeforeIndex +
     YearsAfterIndex +
     log1p(ClinicVisitCountPreIndex) +
-    log1p(DiagnosisEventCountPreIndex) +
     Race +
     Ethnicity,
   data = cohort,

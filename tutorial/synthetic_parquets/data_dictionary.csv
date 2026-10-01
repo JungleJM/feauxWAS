@@ -7,6 +7,6 @@ AgeAtIndex,Patient age at index date.
 YearsBeforeIndex,Observation history before index date.
 YearsAfterIndex,Observation follow-up after index date.
 ClinicVisitCountPreIndex,Pre-index utilization proxy.
-DiagnosisEventCountPreIndex,Pre-index diagnosis density proxy.
-ProblemListCount,Comorbidity/problem-list burden proxy.
+DiagnosisEventCountPreIndex,Pre-index diagnosis count. Not used for matching: these diagnoses are the pre-index outcomes.
+ProblemListCount,"Problem-list count. Not used, for the same reason."
 EligibleForControlPool,Synthetic flag showing basic non-HaT control eligibility.

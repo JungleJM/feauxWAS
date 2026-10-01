@@ -18,6 +18,10 @@ import pandas as pd
 OUT = Path(__file__).resolve().parent / "synthetic_parquets"
 RNG = np.random.default_rng(20260927)
 
+# The real ICD-10-CM code for HaT. It maps to phecode GE_969.4, so it must be
+# removed from the PheWAS events (see prepare_phewas_inputs.py).
+HAT_ICD = "D89.44"
+
 
 def random_dates(n: int, start: str, end: str) -> pd.Series:
     start_ts = pd.Timestamp(start).value // 10**9
@@ -102,7 +106,7 @@ def make_people(n_cases: int = 200, n_controls: int = 10000) -> pd.DataFrame:
 
 def make_index_events(people: pd.DataFrame) -> pd.DataFrame:
     event_type = np.where(people["HaT_Flag"].eq(1), "HaT diagnosis", "pseudo-index encounter")
-    index_icd = np.where(people["HaT_Flag"].eq(1), "D89.44_SYNTHETIC_HAT", "Z00.00")
+    index_icd = np.where(people["HaT_Flag"].eq(1), HAT_ICD, "Z00.00")
     definition = np.where(
         people["HaT_Flag"].eq(1),
         "Synthetic HaT case: repeated HaT-like diagnosis flag",
@@ -135,21 +139,32 @@ def make_diagnosis_events(people: pd.DataFrame) -> pd.DataFrame:
         ("F41.9", "anxiety"),
         ("E78.5", "hyperlipidemia"),
     ]
+    base_probs = np.array([0.08, 0.12, 0.11, 0.09, 0.06, 0.10, 0.04, 0.08, 0.08, 0.10])
+    # Pre-index enrichment: the part of the HaT phenotype present before diagnosis.
+    hat_pre = np.array([0.04, 0.00, 0.05, 0.02, 0.12, 0.08, 0.04, 0.05, 0.02, 0.00])
+    # Post-index enrichment is larger and different: workup after diagnosis
+    # (surveillance) finds more urticaria, fatigue, GI pain and anxiety.
+    hat_post = np.array([0.04, 0.00, 0.08, 0.02, 0.20, 0.15, 0.04, 0.10, 0.08, 0.00])
     for row in people.itertuples(index=False):
-        base_n = max(1, int(RNG.poisson(5 + row.ClinicVisitCountPreIndex / 3)))
-        probs = np.array([0.08, 0.12, 0.11, 0.09, 0.06, 0.10, 0.04, 0.08, 0.08, 0.10])
+        windows = [
+            ("pre-index", row.ClinicVisitCountPreIndex, hat_pre, -1, row.YearsBeforeIndex),
+            ("post-index", row.ClinicVisitCountPostIndex, hat_post, 1, row.YearsAfterIndex),
+        ]
+        for timing, visits, hat_shift, sign, years in windows:
+            n_events = max(1, int(RNG.poisson(3 + visits / 3)))
+            probs = base_probs + (hat_shift if row.HaT_Flag else 0)
+            probs = probs / probs.sum()
+            for ix in RNG.choice(len(background_codes), n_events, p=probs):
+                code, label = background_codes[ix]
+                days = int(RNG.uniform(10, max(years, 0.2) * 365.25))
+                event_date = row.IndexDate + sign * pd.to_timedelta(days, unit="D")
+                rows.append((row.Patient_ID, event_date.normalize(), code, "ICD10CM", label, timing))
         if row.HaT_Flag:
-            probs += np.array([0.04, 0.00, 0.05, 0.02, 0.12, 0.08, 0.04, 0.05, 0.02, 0.00])
-        probs = probs / probs.sum()
-        chosen = RNG.choice(len(background_codes), base_n, p=probs)
-        for ix in chosen:
-            code, label = background_codes[ix]
-            event_date = row.IndexDate - pd.to_timedelta(int(RNG.uniform(10, max(row.YearsBeforeIndex, 0.2) * 365.25)), unit="D")
-            rows.append((row.Patient_ID, event_date.normalize(), code, "ICD10CM", label, "pre-index"))
-        if row.HaT_Flag:
-            for _ in range(int(row.RepeatedHaTDiagnosisCount)):
-                event_date = row.IndexDate + pd.to_timedelta(int(RNG.normal(0, 45)), unit="D")
-                rows.append((row.Patient_ID, event_date.normalize(), "D89.44_SYNTHETIC_HAT", "ICD10CM", "synthetic HaT code", "index-window"))
+            # First HaT code is on the index date; repeats follow within a few months.
+            for k in range(int(row.RepeatedHaTDiagnosisCount)):
+                days = 0 if k == 0 else int(RNG.uniform(1, 120))
+                event_date = row.IndexDate + pd.to_timedelta(days, unit="D")
+                rows.append((row.Patient_ID, event_date.normalize(), HAT_ICD, "ICD10CM", "hereditary alpha tryptasemia", "index"))
     return pd.DataFrame(
         rows,
         columns=["Patient_ID", "DiagnosisDate", "DiagnosisCode", "Vocabulary", "DiagnosisLabel", "Timing"],
@@ -166,6 +181,11 @@ def make_control_samples(people: pd.DataFrame, n_cases: int) -> dict[str, pd.Dat
 
 
 def make_example_matches(people: pd.DataFrame, ratio: int = 4) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Greedy illustration of 4:1 matching, NOT MatchIt.
+
+    Shows what a matched-pairs file looks like. The real match comes from
+    matchit_example.R, which writes matchit_4to1_matched.parquet.
+    """
     cases = people.query("HaT_Flag == 1").copy()
     controls = people.query("EligibleForControlPool == 1").copy()
     used = set()
@@ -244,8 +264,8 @@ def main() -> None:
             ("YearsBeforeIndex", "Observation history before index date."),
             ("YearsAfterIndex", "Observation follow-up after index date."),
             ("ClinicVisitCountPreIndex", "Pre-index utilization proxy."),
-            ("DiagnosisEventCountPreIndex", "Pre-index diagnosis density proxy."),
-            ("ProblemListCount", "Comorbidity/problem-list burden proxy."),
+            ("DiagnosisEventCountPreIndex", "Pre-index diagnosis count. Not used for matching: these diagnoses are the pre-index outcomes."),
+            ("ProblemListCount", "Problem-list count. Not used, for the same reason."),
             ("EligibleForControlPool", "Synthetic flag showing basic non-HaT control eligibility."),
         ],
         columns=["Column", "Meaning"],

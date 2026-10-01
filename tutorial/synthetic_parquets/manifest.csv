@@ -10,5 +10,8 @@ example_4to1_matched_cohort.parquet
 example_4to1_matches.parquet
 hat_patients.parquet
 index_events.parquet
+manifest.csv
 match_ready_cohort.parquet
+matchit_4to1_matched.parquet
+matchit_balance_love_plot.png
 non_hat_patient_pool.parquet

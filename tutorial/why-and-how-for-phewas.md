@@ -134,18 +134,16 @@ python3 "../pheauxWAS/pheauxWAS.py" \
 
 ## Real Data In The VM
 
-The tools expect delimited files, not parquet directly. In the VM, first export the parquet patient table and diagnosis-event table to CSV. Keep the parquet-to-CSV conversion as a reproducible step in the QMD or in a small prep script.
+The tools expect delimited files, not parquet directly. In the VM, export the matched patient table and the diagnosis-event table to CSV with `tutorial/prepare_phewas_inputs.py`. Don't use a plain parquet-to-CSV copy. The script also drops the HaT code `D89.44`, which would otherwise map to its own phecode and come back as a circular top hit, and it keeps only events in the chosen window before or after the index date. pheauxWAS has no option for either. See "Preparing The PheWAS Inputs" in `control-matching-tutorial.md`.
 
-Example Python conversion:
-
-``` python
-import pandas as pd
-
-people = pd.read_parquet("vm_people.parquet")
-events = pd.read_parquet("vm_diagnosis_events.parquet")
-
-people.to_csv("work/hat_people.csv", index=False)
-events.to_csv("work/hat_events.csv", index=False)
+``` bash
+python3 tutorial/prepare_phewas_inputs.py \
+  --cohort vm_matched_cohort.parquet \
+  --events vm_diagnosis_events.parquet \
+  --window pre \
+  --id-col person_id --index-col index_date \
+  --date-col diagnosis_date --code-col diagnosis_code \
+  --out-dir work
 ```
 
 Then run `pheauxWAS`:
@@ -157,7 +155,7 @@ python3 pheauxWAS/pheauxWAS.py \
   --predictors hat \
   --covars age_at_index sex race observation_years encounter_count \
   --sex-col sex \
-  --events work/hat_events.csv \
+  --events work/hat_diagnosis_events_pre.csv \
   --events-id-col person_id \
   --code-col diagnosis_code \
   --vocab-col vocabulary_id \
@@ -166,8 +164,10 @@ python3 pheauxWAS/pheauxWAS.py \
   --definitions phecode/phecodeX_info.csv \
   --min-code-count 2 \
   --min-cases 20 \
-  --out results/hat_phewas
+  --out results/hat_phewas_pre
 ```
+
+`--min-code-count 2` counts distinct dates per person and phecode. The events file must therefore keep **every** diagnosis event, not one row per patient per code. A pull that deduplicates to the earliest event per code leaves everyone with a count of 1, and nobody becomes a phecode case.
 
 Adjust the column names to match the exported VM files. Use `--events-are-phecodes` only if the event table has already been mapped to phecodes.
 
@@ -339,3 +339,6 @@ results |>
 - Matching reduces imbalance but can drop cases and reduce power.
 - Adjustment for utilization is important because patients with more care have more opportunities to accumulate diagnoses.
 - Multiple-testing correction is part of the interpretation; raw p-values alone are not enough.
+- Codes used to define the exposure must be removed from the events, or the exposure's own phecode is a guaranteed hit.
+- Say which time window was tested. Pre-index hits are closer to "part of the HaT phenotype"; post-index-only hits may be diagnostic workup.
+- Matched sets are not used in the regression: it is adjusted logistic regression on a matched cohort, not conditional logistic regression.
