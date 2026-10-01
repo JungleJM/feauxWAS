@@ -24,23 +24,31 @@ py setup_env.py
 
 That creates a fresh `.venv`, installs the Python packages in `requirements.txt`, and installs the bundled `pyPheWAS-2a8fff1` package. Then in VS Code, use "Python: Select Interpreter" and choose the `.venv` for this project.
 
-## GitHub mirror sync
+## Collaboration and private Gitea sync
 
-This repo can keep using the private Gitea remote as `origin` while also pushing a collaborator copy to a private GitHub repo.
-
-First-time setup:
+Normal collaboration happens on the private GitHub repo:
 
 ```bash
-python3 sync_github.py --repo git@github.com:YOUR_USER/pheauxWAS.git
+git add .
+git commit -m "Describe the change"
+git push
 ```
 
-After that, commit your work locally and run:
+The `master` branch tracks GitHub, so plain `git push` goes to the shared repo at `git@github.com:JungleJM/pheauxwas-collab.git`.
+
+The private Gitea repo stays configured as `origin`. When you want to manually catch it up to the GitHub collaboration branch, run:
 
 ```bash
-python3 sync_github.py
+python3 sync_gitea.py
 ```
 
-The script pushes the current branch to a separate `github` remote. It stops if there are uncommitted changes, because only commits can be synced.
+The script pushes the current branch to `origin`. It stops if there are uncommitted changes, because only commits can be synced.
+
+If you ever need to manually push to GitHub without the default branch tracking, use:
+
+```bash
+git push github master
+```
 
 ## bundling
 
