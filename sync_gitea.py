@@ -9,6 +9,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent
+DEFAULT_GITEA_URL_PART = "appliedsci.tail90eacc.ts.net:411/gitea_admin/feauxWAS.git"
 
 
 def git(args: list[str], *, capture: bool = False) -> str:
@@ -22,6 +23,10 @@ def git(args: list[str], *, capture: bool = False) -> str:
 
 def remote_exists(name: str) -> bool:
     return name in git(["remote"], capture=True).splitlines()
+
+
+def remote_url(name: str) -> str:
+    return git(["remote", "get-url", name], capture=True)
 
 
 def current_branch() -> str:
@@ -68,10 +73,28 @@ def main() -> int:
         action="store_true",
         help="show what would be pushed without updating Gitea",
     )
+    parser.add_argument(
+        "--expected-url-part",
+        default=DEFAULT_GITEA_URL_PART,
+        help="text that must appear in the remote URL before pushing",
+    )
+    parser.add_argument(
+        "--allow-non-gitea-remote",
+        action="store_true",
+        help="skip the remote URL safety check",
+    )
     args = parser.parse_args()
 
     if not remote_exists(args.remote):
         raise SystemExit(f"Remote '{args.remote}' does not exist.")
+    url = remote_url(args.remote)
+    if not args.allow_non_gitea_remote and args.expected_url_part not in url:
+        raise SystemExit(
+            f"Refusing to push: remote '{args.remote}' does not look like the private Gitea repo.\n"
+            f"Remote URL is: {url}\n"
+            f"Expected it to contain: {args.expected_url_part}\n"
+            "This protects collaborators whose 'origin' remote points at GitHub."
+        )
 
     branch = current_branch()
     target_branch = args.target_branch or branch
@@ -92,7 +115,10 @@ def main() -> int:
         tag_args.extend([args.remote, "--tags"])
         git(tag_args)
 
-    print(f"\nSynced {branch} -> {args.remote}/{target_branch}")
+    if args.dry_run:
+        print(f"\nDry run OK for {branch} -> {args.remote}/{target_branch}")
+    else:
+        print(f"\nSynced {branch} -> {args.remote}/{target_branch}")
     return 0
 
 
