@@ -12,6 +12,8 @@ Read before working:
 
 - A fact lives in one of those three documents only. Status lives only in the roadmap.
 - When code or the study design changes, update `design.md` in the same commit. When an item is built, delete it from the roadmap. When something is decided, add a numbered decision.
+- Nothing outside the three documents restates them: once a note's content is in them, the note is deleted, and other files point to them (D27).
+- `reference/plan/Attending Questions.md` holds questions for the user's attending: what the data showed, what the study does for now, and the question. Add to it when the user asks; it asks, it doesn't decide.
 - Do not add new design documents. `reference/plan/tasklist.md` is not one: it holds only what is still under discussion (D1).
 - **"Update docs"** means: bring `design.md`, `decisions.md` and `roadmap.md` up to date with the code and the task list by the rules above, move every settled task-list item into them and delete it from the task list, and delete any pasted image in `reference/plan/images/` that no document mentions.
 

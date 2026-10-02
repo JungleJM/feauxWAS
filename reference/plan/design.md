@@ -31,12 +31,11 @@ Cosmos (on the VM)                                  this repo
 
 | | Cases | Controls |
 |------------------|------------------------------|------------------------------|
-| Who | D89.44 on 2+ distinct dates (D4) | No D89.44 at any date (D5) |
-| Index date | First D89.44 | A sampled completed outpatient face-to-face encounter in a case quarter (D6) |
+| Who | D89.44 on at least one date (D24); 2+ dates as a sensitivity analysis | No D89.44 at any date (D5) |
+| Index date | First D89.44 (D4) | A sampled completed Office Visit in a case quarter (D6, D26) |
 | Age at index | `AgeKey` of the index diagnosis → `DurationDim.Years` | `AgeKey` of the index encounter → `DurationDim.Years` |
-| Neither | Patients with exactly one D89.44 | |
 
-Eligibility for both: at least 2 clinic-visit days in the 365 days before index (D8).
+Eligibility for both: at least 2 clinic-visit days in the 365 days before index (D8). Counts from the profile queries, 2026-10-01: 5,967 HaT patients, 3,693 of them with D89.44 on 2+ dates.
 
 ### Derived Fields
 
@@ -48,11 +47,11 @@ Built in Python from the pulled tables, one row per patient:
 | `IndexYear`, `IndexQuarter` | The index date: year `key / 10000`, month `(key / 100) % 100`, quarter `(month - 1) / 3 + 1` |
 | `ObservationStartDate`, `ObservationEndDate` | First and last encounter `DateKey`; the end also no later than `DeathDate` |
 | `YearsBeforeIndex`, `YearsAfterIndex` | Index minus observation start; observation end minus index. |
-| `ClinicVisitCountPreIndex` | Distinct `DateKey`s with `IsOutpatientFaceToFaceVisit = 1`, completed, in the 365 days before index (D8) |
+| `ClinicVisitCountPreIndex` | Distinct `DateKey`s with an EncounterFact row where `DerivedEncounterStatus = 'Complete'` and `DerivedEncounterType_X = 'Office Visit'`, in the 365 days before index (D8, D26) |
 | `ClinicVisitCountPostIndex` | The same, after index |
-| `Race` | `FirstRace`, with blank / unknown / refused / other grouped into one level (D10) |
-| `Sex` | `ReliableSex` (D10), as Male / Female for pheauxWAS's sex-specific phecodes |
-| Case rule | Count of distinct D89.44 dates in the diagnoses |
+| `Race` | `FirstRace`, with blank values and values starting with `*` (`*Unspecified`, ...) grouped into one Unknown level (D10) |
+| `Sex` | `ReliableSex`; `Sex` where it is Ambiguous; Unknown dropped (D25). Male / Female, for exact matching and pheauxWAS's sex-specific phecodes |
+| `HaTDateCount` | Distinct D89.44 dates, for the 2+ sensitivity analysis (D24) |
 
 Not collected: diagnosis count before index, problem-list count (D9).
 
@@ -92,7 +91,7 @@ pheauxWAS then fits, for each phecode with at least 20 cases, `phecode ~ HaT_Fla
 | `hat_Encounters` | One per encounter | EncounterFact `ef` | the PK on `PatientDurableKey` | live rows; date window |
 | `hat_Diagnoses` | One per diagnosis event and code (D17) | DiagnosisEventFact `def` | the PK; DiagnosisTerminologyDim | live rows; date window; ICD-10-CM |
 
-`hat_Patients` carries index (date, diagnosis event, encounter, code, age) and demographics (`Sex`, `ReliableSex`, `FirstRace`, `MultiRacial`, `Ethnicity`, `BirthDate`, `DeathDate`). It is everyone with any D89.44, so it is also the control exclusion list (D5); the 2-date rule is applied in Python. `hat_Encounters` carries the date, status, type and the outpatient, ED and admission flags. `hat_Diagnoses` carries date, code, vocabulary, event and encounter keys, and the diagnosis's `Type` and `Status`.
+`hat_Patients` carries index (date, diagnosis event, encounter, code, age) and demographics (`Sex`, `ReliableSex`, `FirstRace`, `MultiRacial`, `Ethnicity`, `BirthDate`, `DeathDate`). It is everyone with any D89.44: every case (D24) and the control exclusion list (D5). `hat_Encounters` carries the date, status, type and the outpatient, ED and admission flags. `hat_Diagnoses` carries date, code, vocabulary, event and encounter keys, and the diagnosis's `Type` and `Status`.
 
 DurationDim is a LEFT JOIN so that a missing age does not push a patient's index to a later D89.44. Not pulled: ProblemListFact (D9); EdVisitFact and HospitalAdmissionFact, which EncounterFact's flags cover.
 

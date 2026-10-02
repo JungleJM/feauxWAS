@@ -56,6 +56,14 @@ Entries are grouped, numbered stably, and never renumbered. A reversed decision 
 
 **Rejected.** Filled boxes (also rendered, but busier); coloured text, highlights, tables, collapsible blocks, `diff` code blocks and the rest of the test.
 
+### D27. Nothing outside the plan documents restates them
+
+**Amends D1.**
+
+**Context.** Notes written before the plan documents (`reference/cosmos_parquet_ref.yaml`, `Questions.md`) repeated facts that are now in design, decisions and roadmap, so two copies could drift.
+
+**Decision.** Once a note's content is in the plan documents, the note is deleted. Other files point to the plan documents rather than restating them. `cosmos_parquet_ref.yaml` and `Questions.md` were deleted on 2026-10-02. Questions for the user's attending are kept in `reference/plan/Attending Questions.md`, which asks rather than decides.
+
 ------------------------------------------------------------------------
 
 ## Study Design
@@ -68,11 +76,15 @@ Entries are grouped, numbered stably, and never renumbered. A reversed decision 
 
 **Consequences.** D89.44 entered ICD-10-CM around October 2021, so no index is earlier; a patient coded D89.40 or D89.49 before then has an index later than their real diagnosis. How many is measured, not assumed (roadmap).
 
+**Superseded by D24** for the case rule (1+ dates); the index (first D89.44) stands.
+
 ### D5. Controls never had D89.44; one-code patients are neither
 
 **Decision.** Controls are patients with no D89.44 at any date, "no known HaT" rather than proven non-HaT. Patients with exactly one D89.44 are neither cases nor controls, so the control exclusion list is everyone with any D89.44.
 
 **Cost.** Untested controls may include undiagnosed HaT: exposure misclassification, stated in the write-up.
+
+**Amended by D24:** with a 1-date case rule there is no one-code group; everyone with any D89.44 is a case.
 
 ### D6. Control pseudo-index dates come from an encounter in a case quarter
 
@@ -90,6 +102,8 @@ Entries are grouped, numbered stably, and never renumbered. A reversed decision 
 
 **Decision.** A clinic visit is a distinct `DateKey` with an EncounterFact row where `IsOutpatientFaceToFaceVisit = 1` and the encounter is completed. Eligibility (cases and controls): at least 2 clinic-visit days in the 365 days before index. Matching: the count of clinic-visit days in those 365 days. ED visits (`IsEdVisit`) and admissions (`IsHospitalAdmission`) are counted separately if used, not lumped in.
 
+**Amended by D26:** a clinic visit is an Office Visit only.
+
 ### D9. No matching or adjusting on diagnosis or problem-list counts
 
 **Context.** The first tutorial matched on the number of diagnoses before index, and the extraction plan collected a problem-list count.
@@ -99,6 +113,8 @@ Entries are grouped, numbered stably, and never renumbered. A reversed decision 
 ### D10. Demographics: group unknown race, keep ethnicity, use ReliableSex
 
 **Decision.** Blank, unknown, refused and "other" race values are grouped into one level, not dropped, since dropping can remove cases and controls unevenly. `Ethnicity` is kept (race does not capture Hispanic ethnicity). `ReliableSex`, "cleaned for analytic use", is preferred to `Sex`; `MultiRacial` is pulled alongside `FirstRace`.
+
+**Amended by D25:** `ReliableSex`, falling back to `Sex` when Ambiguous.
 
 ### D11. Exposure-defining codes are removed from the PheWAS events
 
@@ -119,6 +135,32 @@ Entries are grouped, numbered stably, and never renumbered. A reversed decision 
 **Decision.** pheauxWAS ignores MatchIt's matched sets (`subclass`) and fits covariate-adjusted logistic regression on the matched cohort. Stated in the methods.
 
 **Rejected, for now.** Conditional logistic regression within matched sets: the stricter choice, which pheauxWAS does not do.
+
+### D24. Cases: D89.44 on at least one date
+
+**Supersedes D4's 2-date rule; provisional.**
+
+**Context.** Profile queries (2026-10-01): 5,967 patients have D89.44 at least once, 3,693 on 2 or more distinct dates. The 2-date rule is a PheWAS habit for common conditions, where one-off and rule-out codes are frequent. HaT is diagnosed by genetic testing, so a single D89.44 is likely reliable, and the user's earlier work and papers use the ~6,000.
+
+**Decision.** A case has D89.44 on at least one date (5,967). The index stays the first D89.44 (D4). 2+ dates is the sensitivity analysis. Both counts are reported.
+
+**Consequences.** The pull is unchanged: it holds everyone with any D89.44 and every D89.44 date, so the rule can be switched in Python if the user's attending advises it (`Attending Questions.md`).
+
+### D25. Sex: ReliableSex, falling back to Sex
+
+**Amends D10.**
+
+**Context.** Among HaT patients, `ReliableSex` is Female 4,452, Male 1,379 and Ambiguous 136; for the Ambiguous, `Sex` says Female 105, Male 30, Unknown 1.
+
+**Decision.** Use `ReliableSex`; where it is Ambiguous, use `Sex`; drop the one patient whose `Sex` is Unknown, since exact matching and sex-specific phecodes need Male or Female.
+
+### D26. A clinic visit is an Office Visit
+
+**Amends D8.**
+
+**Context.** `IsOutpatientFaceToFaceVisit = 1` covers both Office Visit and Hospital Outpatient Visit (profile query 5), and the second can be labs, imaging or infusions, which would count testing as clinic contact.
+
+**Decision.** A clinic visit is an EncounterFact row with `DerivedEncounterStatus = 'Complete'` and `DerivedEncounterType_X = 'Office Visit'`, counted as distinct `DateKey`s. Query 10 lists every flagged type, in case another belongs.
 
 ------------------------------------------------------------------------
 
