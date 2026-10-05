@@ -19,12 +19,9 @@ When this document and the code or study disagree, one of them is wrong. Fix whi
 The HaT PheWAS asks which diagnoses, across the whole phenome, are more or less common in patients with hereditary alpha tryptasemia (HaT) than in similar patients without known HaT. It is a discovery study: an association among similarly observable patients, not proof that HaT causes a phenotype.
 
 ``` text
-Cosmos (on the VM)                                  this repo
-  hat_ pull ─┐
-             ├─► one row per patient ──► MatchIt 4:1 ──► prepare_phewas_inputs.py ──► pheauxWAS
-  ctrl_ pull ┘   (cases + ~50× pool)     (matched ~30k)   (drop D89.44, pick window)    (per phecode)
-                                              │
-                                              └─► ctrl_ diagnoses pulled for the matched only (D16)
+Cosmos (on the VM)                 build_group_parquet.py           MatchIt 10:1     prepare_phewas_inputs.py      pheauxWAS
+  hat_ pull  (4 tables) ─► hat_group.parquet     + _diagnoses ─┐
+  ctrl_ pull (4 tables) ─► control_group.parquet + _diagnoses ─┴─► matched cohort ─► drop D89.44, pick window ─► per phecode
 ```
 
 ### Cases And Controls
@@ -37,65 +34,64 @@ Cosmos (on the VM)                                  this repo
 
 Eligibility for both: at least 2 clinic-visit days in the 365 days before index (D8). Counts from the profile queries, 2026-10-01: 5,967 HaT patients, 3,693 of them with D89.44 on 2+ dates.
 
-### Derived Fields
+### The Group Files
 
-Built in Python from the pulled tables, one row per patient:
+`tutorial/adapting-cosmos/build_group_parquet.py` turns each pull into `<group>_group.parquet`, one row per patient, and `<group>_group_diagnoses.parquet`, one row per patient, ICD-10-CM code and date (D29). Its README lists every column and each step. The study's choices it applies:
 
-| Field | From |
-|------------------------------------|------------------------------------|
-| `IndexDate` | A DateKey (`YYYYMMDD` integer), converted to a date |
-| `IndexYear`, `IndexQuarter` | The index date: year `key / 10000`, month `(key / 100) % 100`, quarter `(month - 1) / 3 + 1` |
-| `ObservationStartDate`, `ObservationEndDate` | First and last encounter `DateKey`; the end also no later than `DeathDate` |
-| `YearsBeforeIndex`, `YearsAfterIndex` | Index minus observation start; observation end minus index. |
-| `ClinicVisitCountPreIndex` | Distinct `DateKey`s with an EncounterFact row where `DerivedEncounterStatus = 'Complete'` and `DerivedEncounterType_X = 'Office Visit'`, in the 365 days before index (D8, D26) |
-| `ClinicVisitCountPostIndex` | The same, after index |
-| `Race` | `FirstRace`, with blank values and values starting with `*` (`*Unspecified`, ...) grouped into one Unknown level (D10) |
-| `Sex` | `ReliableSex`; `Sex` where it is Ambiguous; Unknown dropped (D25). Male / Female, for exact matching and pheauxWAS's sex-specific phecodes |
-| `HaTDateCount` | Distinct D89.44 dates, for the 2+ sensitivity analysis (D24) |
+- diagnoses with a ruled-out or error `DiagnosisStatus` are dropped, then collapsed to one row per patient, code and date;
+- a case's index is their first D89.44 surviving that filter (D4, D24); a control's is the sampled clinic visit (D30), and a control with any D89.44 is dropped;
+- `Sex` is `ReliableSex`, else `Sex` (D25); unknown race and ethnicity values (blank, `*`-prefixed) are one `Unknown` level (D10);
+- observation runs from the first to the last completed encounter, capped at death and the data's end;
+- `ClinicVisits365Before` counts days with a completed Office Visit or Follow-Up in the year before index (D8, D31);
+- eligible for matching: at least 2 such days, a usable sex, and for cases an index from 2021-10-01 on;
+- also kept, for describing the cases: D89.44 date count (the 2+ sensitivity analysis), the first earlier D89.4x code, and baseline serum tryptase (components 2287 and 59082, ng/mL).
 
-Not collected: diagnosis count before index, problem-list count (D9).
+Not used: diagnosis count before index, problem-list count (D9).
 
 ### Matching
 
-MatchIt, 4 controls per case, without replacement (D7):
+MatchIt, 10 controls per case, without replacement (D7, D32), on the eligible patients of both groups:
 
 ``` r
 matchit(HaT_Flag ~ AgeAtIndex + YearsBeforeIndex + YearsAfterIndex +
-          log1p(ClinicVisitCountPreIndex) + Race + Ethnicity,
+          log1p(ClinicVisits365Before) + Race + Ethnicity,
         method = "nearest", distance = "glm",
         exact = ~ Sex + IndexQuarter,
-        ratio = 4, replace = FALSE, caliper = 0.2, std.caliper = TRUE)
+        ratio = 10, replace = FALSE, caliper = 0.2, std.caliper = TRUE)
 ```
 
 Balance: standardized mean difference under 0.1 for every variable (`cobalt::love.plot`). Unmatched cases are reviewed: if quarter is too strict, year is the fallback.
 
 ### The PheWAS
 
-`tutorial/prepare_phewas_inputs.py` turns the matched cohort and the diagnoses into pheauxWAS's CSVs:
+`tutorial/prepare_phewas_inputs.py` turns the matched cohort and both groups' diagnosis files into pheauxWAS's CSVs:
 
-- keeps only events for patients in the matched cohort;
+- keeps only diagnoses of patients in the matched cohort;
 - drops the exposure codes, D89.44 by default (D11);
 - keeps one window relative to each patient's index: `pre` (with `--lookback-years 3`, the primary analysis), `post` (sensitivity) or `all`. The index day is in neither pre nor post (D12).
 
-pheauxWAS then fits, for each phecode with at least 20 cases, `phecode ~ HaT_Flag + AgeAtIndex + Sex + Race + Ethnicity + YearsBeforeIndex + ClinicVisitCountPreIndex`, as ordinary logistic regression on the matched cohort (D13). A person is a phecode case with the code on 2+ distinct dates; one-date people are excluded from that phecode.
+pheauxWAS then fits, for each phecode with at least 20 cases, `phecode ~ HaT_Flag + AgeAtIndex + Sex + Race + Ethnicity + YearsBeforeIndex + ClinicVisits365Before`, as ordinary logistic regression on the matched cohort (D13). A person is a phecode case with the code on 2+ distinct dates; one-date people are excluded from that phecode.
 
 ------------------------------------------------------------------------
 
 ## The Cosmos Pull
 
-`reference/HaT_PheWAS_intake.yaml` is a Telescope intake, project "HaT PheWAS", built from dictionary tables (D18). It is validated with Telescope's `makeYaml.py --validate` and run on the VM by Telescope. Window 1990-01-01 to 2026-06-01, all history, with the analysis window applied in Python (D23); ICD-10-CM only (D15); Dual (Cosmos and SneakPeek); 2,000 patients per chunk.
+The `hat_` pull ran on the VM on 2026-10-02 (D28). `tutorial/pulling-cohorts/HaT_PheWAS_intake.yaml` is the Telescope intake, and `reference/hat_cosmos_blueprint.yaml` the blueprint as run: project "HaT PheWAS", window 2015-01-01 to 2026-06-01, ICD-10-CM only (D15), Dual (Cosmos and SneakPeek), 1,000 patients per chunk. Every table takes every column its Cosmos tables offer; what to drop is decided in Python.
 
 | Table | Rows | From | Joins | Where |
 |------------------|------------------|------------------|------------------|------------------|
 | `hat_Patients` (PK) | One per patient with any D89.44, at the first | DiagnosisEventFact `def` | DiagnosisTerminologyDim `dt` on `DiagnosisKey`; PatientDim `p` on `DurableKey`; LEFT DurationDim `dur` on `AgeKey` | live rows; date window; `dt.Type = 'ICD-10-CM'`, `dt.Value = 'D89.44'`; `p.IsCurrent`, `IsValid`, `UseInCosmosAnalytics_X` |
-| `hat_Encounters` | One per encounter | EncounterFact `ef` | the PK on `PatientDurableKey` | live rows; date window |
+| `hat_Encounters` | One per encounter | EncounterFact `ef` | the PK on `PatientDurableKey`; LEFT DepartmentDim `dep` on `DepartmentKey` | live rows; date window |
 | `hat_Diagnoses` | One per diagnosis event and code (D17) | DiagnosisEventFact `def` | the PK; DiagnosisTerminologyDim | live rows; date window; ICD-10-CM |
+| `hat_Labs` | One per tryptase result | LabComponentResultFact `lcrf` | the PK; LEFT LabComponentDim `lcd` | live rows; date window on `PrioritizedDateKey`; the eight tryptase `LabComponentKey`s |
 
-`hat_Patients` carries index (date, diagnosis event, encounter, code, age) and demographics (`Sex`, `ReliableSex`, `FirstRace`, `MultiRacial`, `Ethnicity`, `BirthDate`, `DeathDate`). It is everyone with any D89.44: every case (D24) and the control exclusion list (D5). `hat_Encounters` carries the date, status, type and the outpatient, ED and admission flags. `hat_Diagnoses` carries date, code, vocabulary, event and encounter keys, and the diagnosis's `Type` and `Status`.
+`hat_Patients` is everyone with any D89.44: every case (D24) and the control exclusion list (D5). Its index columns are prefixed `Index`; it also carries every PatientDim column. `hat_Encounters` carries `DepartmentSpecialty` and the site's `SiteFullyUsableInCosmos…` dates. `hat_Labs`' eight components and what each measures are in the blueprint's description; only 2287 (and maybe 59082) are baseline serum tryptase in ng/mL.
+
+**The `ctrl_` pull** (`tutorial/adapting-cosmos/ctrl_PheWAS_intake.yaml`, D30) has the same fact tables and columns, with `ctrl_Patients` as the PK: one random completed Office Visit or Follow-Up per patient from 2021-10-01 (the pseudo-index), excluding the uploaded `hat_patient_keys.parquet`. A hash of the patient key keeps about 1% of patients (`pool_permille: 10`), and `smallset` with `stop_at_for_pk_table: 300000` and `random_pk_sample` caps the pool at 300,000 in a reproducible hash order. Not yet run.
 
 DurationDim is a LEFT JOIN so that a missing age does not push a patient's index to a later D89.44. Not pulled: ProblemListFact (D9); EdVisitFact and HospitalAdmissionFact, which EncounterFact's flags cover.
 
-`reference/plan/profile_queries.sql` holds aggregate SSMS queries that size the cohort and show column values before the pull; each says what to look for.
+`tutorial/pulling-cohorts/profile_queries.sql` holds aggregate SSMS queries that size the cohort and show column values before a pull; each says what to look for.
 
 ### The Data Dictionary
 
@@ -123,16 +119,19 @@ Then validate the intake again.
 
 ## The Tutorial
 
-`tutorial/` runs the whole method on synthetic data. `README.md` lists the files and commands; `control-matching-tutorial.md` and `why-and-how-for-phewas.md` explain the method in plain English; `hat-control-recipe.yaml` describes the study in one place.
+`tutorial/` runs the whole method on synthetic data shaped like the real pulls: the same table and column names, keeping only the columns the builder reads. `control-matching-tutorial.md` walks through it; `why-and-how-for-phewas.md` explains PheWAS and the two tools. It teaches the method and points here for the study's own choices (D27).
 
 ``` text
-make_synthetic_hat_parquets.py ─► synthetic_parquets/ (200 cases, 10,000 non-HaT)
-matchit_example.R              ─► matchit_4to1_matched.parquet, balance plot
-prepare_phewas_inputs.py       ─► work/hat_people_matched.csv, work/hat_diagnosis_events_<window>.csv
-pheauxWAS.py                   ─► results/hat_phewas_<window>_*
+make_synthetic_cosmos_parquets.py      ─► synthetic_cosmos/hat/, synthetic_cosmos/ctrl/ (400 cases, 16,000 pool)
+adapting-cosmos/build_group_parquet.py ─► hat_group.parquet, control_group.parquet (+ _diagnoses), in each folder
+matchit_example.R                      ─► work/matched_cohort.parquet, balance plot
+prepare_phewas_inputs.py               ─► work/people_matched.csv, work/diagnosis_events_<window>.csv
+pheauxWAS.py                           ─► results/hat_phewas_<window>_*
 ```
 
-The synthetic cases carry the real D89.44 and events before and after index, with a larger post-index enrichment, so the exposure-code problem and the window difference both show (D19). The `example_4to1_*` files are a greedy illustration; the match is MatchIt's (D20).
+The synthetic cases carry the real D89.44 (single-date cases among them), earlier D89.40 codes, ruled-out diagnoses, cancelled visits, IgE tryptase rows, and more diagnoses after index than before, so each step has something to show (D19).
+
+------------------------------------------------------------------------
 
 ## Environments
 

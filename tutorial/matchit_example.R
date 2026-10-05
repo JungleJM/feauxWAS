@@ -12,7 +12,13 @@ library(arrow)
 library(cobalt)
 library(dplyr)
 
-cohort <- read_parquet("tutorial/synthetic_parquets/match_ready_cohort.parquet") |>
+# The two group files from adapting-cosmos/build_group_parquet.py.
+# On the VM, point these at the real hat_group.parquet and control_group.parquet.
+hat <- read_parquet("tutorial/synthetic_cosmos/hat/hat_group.parquet")
+control <- read_parquet("tutorial/synthetic_cosmos/ctrl/control_group.parquet")
+
+cohort <- bind_rows(hat, control) |>
+  filter(EligibleForMatching == 1) |>
   mutate(
     HaT_Flag = as.integer(HaT_Flag),
     Sex = factor(Sex),
@@ -25,24 +31,25 @@ match <- matchit(
   HaT_Flag ~ AgeAtIndex +
     YearsBeforeIndex +
     YearsAfterIndex +
-    log1p(ClinicVisitCountPreIndex) +
+    log1p(ClinicVisits365Before) +
     Race +
     Ethnicity,
   data = cohort,
   method = "nearest",
   distance = "glm",
   exact = ~ Sex + IndexQuarter,
-  ratio = 4,
+  ratio = 10,
   replace = FALSE,
   caliper = 0.2,
   std.caliper = TRUE
 )
 
-print(summary(match))
+print(summary(match, un = FALSE))
 
+dir.create("tutorial/work", showWarnings = FALSE)
 matched <- match.data(match)
-write_parquet(matched, "tutorial/synthetic_parquets/matchit_4to1_matched.parquet")
+write_parquet(matched, "tutorial/work/matched_cohort.parquet")
 
-png("tutorial/synthetic_parquets/matchit_balance_love_plot.png", width = 1200, height = 800)
+png("tutorial/work/matchit_balance_love_plot.png", width = 1200, height = 800)
 print(love.plot(match, threshold = 0.1))
 dev.off()

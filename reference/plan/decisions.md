@@ -92,11 +92,15 @@ Entries are grouped, numbered stably, and never renumbered. A reversed decision 
 
 **Rejected.** Choosing controls with a new diagnosis in the same window, or with nearby (GI, immune) diagnoses. That selects on outcomes; controls should match on the chance to be observed, not on phenotype.
 
+**Amended by D30:** how the pool is drawn in a Telescope pull.
+
 ### D7. Match 4:1 in MatchIt
 
 **Decision.** Exact on sex and index quarter; nearest neighbour on a logistic propensity score from age at index, years before and after index, log(clinic visits before index), race and ethnicity; caliper 0.2 SD, no replacement, 4 controls per case. Balance is checked (standardized mean difference under 0.1) and unmatched cases are reviewed.
 
 **Consequences.** The PheWAS tests against the \~4× matched controls; the rest of the \~50× pool is discarded (D16).
+
+**Amended by D32:** 10 controls per case.
 
 ### D8. Utilization is clinic visits
 
@@ -162,6 +166,22 @@ Entries are grouped, numbered stably, and never renumbered. A reversed decision 
 
 **Decision.** A clinic visit is an EncounterFact row with `DerivedEncounterStatus = 'Complete'` and `DerivedEncounterType_X = 'Office Visit'`, counted as distinct `DateKey`s. Query 10 lists every flagged type, in case another belongs.
 
+**Amended by D31:** Follow-Up counts too.
+
+### D31. A clinic visit is an Office Visit or a Follow-Up
+
+**Amends D26.**
+
+**Context.** Profile query 10 showed the face-to-face flag also covers Follow-Up, Procedure visit, Telemedicine, Routine Prenatal, Infusion, Home Care Visit, Surgery and Anticoagulation Visit.
+
+**Decision.** A clinic visit is a completed (`DerivedEncounterStatus = 'Complete'`) encounter whose `DerivedEncounterType_X` is `Office Visit` or `Follow-Up`. Control pseudo-index visits are drawn from the same types.
+
+### D32. 10 controls per case
+
+**Amends D7.**
+
+**Decision.** MatchIt keeps 10 controls per case (about 60,000 for 5,967 cases); everything else in D7 stands.
+
 ------------------------------------------------------------------------
 
 ## The Cosmos Pull
@@ -186,6 +206,8 @@ Entries are grouped, numbered stably, and never renumbered. A reversed decision 
 
 **Consequences.** About 276k candidates never have their diagnoses pulled.
 
+**Superseded by D30:** the control pull is one stage.
+
 ### D17. Diagnoses are pulled one row per diagnosis event
 
 **Context.** The first intake kept one row per patient, code and date. When several rows share a day, only one survived, and its `Type` and `Status` with it, so a later filter (dropping ruled-out diagnoses) could lose a date that also had a billed diagnosis.
@@ -204,9 +226,37 @@ Entries are grouped, numbered stably, and never renumbered. A reversed decision 
 
 **Consequences.** `YearsBeforeIndex` is now true record length, not capped. The pull is bigger, which is cheap at ~6,000 HaT patients; for controls, history is pulled for the matched only (D16).
 
+**Amended by D28:** the pull as run starts at 2015-01-01.
+
 ### D18. The pull is a Telescope intake built from dictionary tables
 
 **Decision.** `reference/HaT_PheWAS_intake.yaml`, project "HaT PheWAS", builds its tables from Cosmos dictionary tables directly, not from Telescope recipes (D3). HaT tables are named `hat_`, control tables will be `ctrl_`, with the same columns.
+
+### D28. The hat_ pull as run: every column, tryptase labs, from 2015
+
+**Amends D18 and D23.**
+
+**Context.** The user widened the intake in Telescope before running it on the VM (2026-10-02); the blueprint as run is `reference/hat_cosmos_blueprint.yaml`, with notes in `reference/plan/Future discussions/HaT Considerations.md`.
+
+**Decision.** Every table takes every column its Cosmos tables offer, culled in Python. `hat_Labs` adds every tryptase result (eight LabComponentKeys, every LabComponentResultFact and LabComponentDim column), to validate cases and later screen controls. `hat_Encounters` LEFT JOINs DepartmentDim for specialty. The window starts at 2015-01-01, not 1990: three years before the earliest index seen in 2018, and the ICD-10 era.
+
+**Consequences.** A patient whose first D89.44 is before 2015 gets a later index from this pull; profile query 7 counts them (some first dates are in 2017 and earlier). The `ctrl_` pull takes the same columns.
+
+### D29. Each group is two parquets: patients and diagnoses
+
+**Decision.** `tutorial/adapting-cosmos/build_group_parquet.py` turns a pull's parquets into `<group>_group.parquet` (one row per patient: everything matching needs) and `<group>_group_diagnoses.parquet` (one row per patient, ICD-10-CM code and date). The groups are `hat` and `control`.
+
+**Rejected.** One file with each patient's diagnoses as a list inside their row: one file, but harder to read and to reason about.
+
+### D30. The control pull is one stage, a random pool of 300,000
+
+**Supersedes D16; amends D6.**
+
+**Context.** Telescope can cap a PK inside Cosmos only with `smallset`, `stop_at_for_pk_table` and `random_pk_sample` (a reproducible sample ordered by a hash of the key, Telescope's D60). Its control sampling (`row_mult`, Telescope's D59) balances per batch but samples after the whole population lands in Projects, which cannot work for Cosmos's hundreds of millions of patients. Cases begin in earnest in 2021 Q4 (244 that quarter, against 19 the quarter before) and reach 486 in a quarter.
+
+**Decision.** One pull, shaped like the `hat_` pull: `ctrl_Patients` is the PK and `ctrl_Encounters`, `ctrl_Diagnoses` and `ctrl_Labs` are fact tables with the same columns. The PK is one random clinic visit (D31) per patient, from 2021-10-01 to 2026-06-01, for patients not in `hat_Patients` (uploaded keys, `NOT IN`). A hash of the patient key first thins Cosmos to about 1% of patients, so the dedup and the hash-ordered `TOP` run on millions of rows, not billions; `stop_at_for_pk_table` then caps the pool at 300,000 (about 50 per case). MatchIt's exact quarter does the balancing (D7).
+
+**Consequences.** Every table is pulled for 300,000 patients, most of whom MatchIt discards: a long pull, chunked like the `hat_` one. Quarters are not balanced in SQL, so the busiest (486 cases) relies on the pool's size. Patients whose only D89.44 is before 2015 are not in the uploaded keys; the builder drops any control with a D89.44.
 
 ------------------------------------------------------------------------
 
@@ -216,6 +266,10 @@ Entries are grouped, numbered stably, and never renumbered. A reversed decision 
 
 **Decision.** The generator gives cases the real D89.44 (not a made-up code), so the exposure-code problem (D11) shows up in the tutorial as it would in real data, and it writes events before and after index, with a larger post-index enrichment, so the windows (D12) visibly differ.
 
+**Amended (2026-10-03):** the generator is now `make_synthetic_cosmos_parquets.py`, writing pulls shaped like the real ones (D29); the patterns stand.
+
 ### D20. The greedy example match is labelled as such
 
 **Decision.** `example_4to1_*` files come from a simple greedy match in the generator, kept to show a matched-pairs file's shape. The tutorial's match is MatchIt's, `matchit_4to1_matched.parquet`.
+
+**Superseded (2026-10-03):** the greedy example went with the old generator; the tutorial's only match is MatchIt's.

@@ -24,7 +24,7 @@ The exponentiated HaT coefficient is an odds ratio for that phecode, adjusted fo
 
 There are two different "control" ideas here.
 
-First, the study-level controls are people without known HaT who come from the same source population as the HaT cohort. For the 6,000 known HaT patients, the cleanest starting design is:
+First, the study-level controls are people without known HaT who come from the same source population as the HaT cohort. The cleanest starting design is:
 
 - Cases: patients with known HaT or a validated HaT cohort flag.
 - Candidate controls: patients eligible to have been observed in the same health system and time window, without the HaT flag.
@@ -34,25 +34,6 @@ First, the study-level controls are people without known HaT who come from the s
 Second, each phecode regression creates outcome-level controls. For a given phecode, cases are people who meet the diagnosis count rule for that phecode. Controls are the remaining study people, after removing ambiguous one-code patients and, in `pheauxWAS` default mode, people with related exclusion phecodes or impossible sex-specific codes.
 
 For HaT, I would not pick arbitrary random controls from the whole database unless the source population is well defined. Pull candidate controls from the same VM data universe using the same basic eligibility criteria as cases, assign each control an index date comparable to case diagnosis/index date, require enough observation before/after that date, then match or adjust. Random sampling is fine after those restrictions.
-
-## Suggested HaT Population Pull
-
-Minimum population fields:
-
-- `id`: stable patient identifier.
-- `hat`: binary exposure, `1` for HaT cohort, `0` for controls.
-- `index_date`: HaT diagnosis/testing date for cases; assigned comparable date for controls.
-- `age_at_index` or birth date.
-- `sex`, race/ethnicity, site/system, and ancestry PCs if available.
-- Utilization measures: number of encounters, observation years, or first/last encounter dates.
-- Diagnosis events: one row per ICD event with `id`, ICD code, vocabulary/version, and event date.
-
-Recommended eligibility:
-
-- Same health-system data source for cases and controls.
-- At least one or two years of observation before index date if you want prevalent phenotypes.
-- Similar calendar period/index date distribution.
-- Exclude controls with evidence of HaT if any proxy exists, but acknowledge that lack of testing does not prove absence.
 
 ## Synthetic Data Commands
 
@@ -134,42 +115,9 @@ python3 "../pheauxWAS/pheauxWAS.py" \
 
 ## Real Data In The VM
 
-The tools expect delimited files, not parquet directly. In the VM, export the matched patient table and the diagnosis-event table to CSV with `tutorial/prepare_phewas_inputs.py`. Don't use a plain parquet-to-CSV copy. The script also drops the HaT code `D89.44`, which would otherwise map to its own phecode and come back as a circular top hit, and it keeps only events in the chosen window before or after the index date. pheauxWAS has no option for either. See "Preparing The PheWAS Inputs" in `control-matching-tutorial.md`.
+The tools expect delimited files, not parquet. For the HaT study, `adapting-cosmos/build_group_parquet.py` turns each Cosmos pull into a group's patient and diagnosis parquets, `matchit_example.R` matches them, and `prepare_phewas_inputs.py` writes pheauxWAS's CSVs: it drops the exposure code and keeps one time window, which pheauxWAS can't do itself. The commands, in order, are in `control-matching-tutorial.md`; what the HaT study itself chose is in `reference/plan/design.md`.
 
-``` bash
-python3 tutorial/prepare_phewas_inputs.py \
-  --cohort vm_matched_cohort.parquet \
-  --events vm_diagnosis_events.parquet \
-  --window pre \
-  --id-col person_id --index-col index_date \
-  --date-col diagnosis_date --code-col diagnosis_code \
-  --out-dir work
-```
-
-Then run `pheauxWAS`:
-
-``` bash
-python3 pheauxWAS/pheauxWAS.py \
-  --people work/hat_people.csv \
-  --id-col person_id \
-  --predictors hat \
-  --covars age_at_index sex race observation_years encounter_count \
-  --sex-col sex \
-  --events work/hat_diagnosis_events_pre.csv \
-  --events-id-col person_id \
-  --code-col diagnosis_code \
-  --vocab-col vocabulary_id \
-  --date-col diagnosis_date \
-  --map phecode/phecodeX_ICD_CM_map_flat.csv \
-  --definitions phecode/phecodeX_info.csv \
-  --min-code-count 2 \
-  --min-cases 20 \
-  --out results/hat_phewas_pre
-```
-
-`--min-code-count 2` counts distinct dates per person and phecode. The events file must therefore keep **every** diagnosis event, not one row per patient per code. A pull that deduplicates to the earliest event per code leaves everyone with a count of 1, and nobody becomes a phecode case.
-
-Adjust the column names to match the exported VM files. Use `--events-are-phecodes` only if the event table has already been mapped to phecodes.
+`--min-code-count 2` counts distinct dates per person and phecode. The events file must therefore keep **every** diagnosis date, not one row per patient per code. A pull that deduplicates to the earliest event per code leaves everyone with a count of 1, and nobody becomes a phecode case.
 
 ## `pheauxWAS` Parameter Notes
 
@@ -244,64 +192,6 @@ python3 pyPheWAS-2a8fff1/bin/maximizeControls \
 ```
 
 This tries to keep four controls per case, exactly matched on sex, within two years on age, and within one year on index year. If the match cannot be achieved, some cases may be dropped; inspect the matched-pairs output.
-
-## YAML Recipe Idea
-
-A YAML recipe should describe the study once, then a small Python or R wrapper can translate it into the CLI commands above. A minimal recipe could look like this:
-
-``` yaml
-study:
-  name: hat_synthetic
-  engine: pheauxwas
-  out_prefix: results/hat_synthetic
-
-inputs:
-  people: work/hat_people.csv
-  events: work/hat_events.csv
-  id_col: person_id
-  events_id_col: person_id
-  code_col: diagnosis_code
-  vocab_col: vocabulary_id
-  date_col: diagnosis_date
-  map: phecode/phecodeX_ICD_CM_map_flat.csv
-  definitions: phecode/phecodeX_info.csv
-
-model:
-  predictors: [hat]
-  covariates: [age_at_index, sex, race, observation_years, encounter_count]
-  sex_col: sex
-  min_code_count: 2
-  min_cases: 20
-  firth: auto
-
-matching:
-  enabled: true
-  ratio: 4
-  keys: [sex, age_at_index, index_year]
-  deltas: [0, 2, 1]
-```
-
-The wrapper would turn that into a command like:
-
-``` bash
-python3 pheauxWAS/pheauxWAS.py \
-  --people work/hat_people.csv \
-  --id-col person_id \
-  --predictors hat \
-  --covars age_at_index sex race observation_years encounter_count \
-  --sex-col sex \
-  --events work/hat_events.csv \
-  --events-id-col person_id \
-  --code-col diagnosis_code \
-  --vocab-col vocabulary_id \
-  --date-col diagnosis_date \
-  --map phecode/phecodeX_ICD_CM_map_flat.csv \
-  --definitions phecode/phecodeX_info.csv \
-  --min-code-count 2 \
-  --min-cases 20 \
-  --firth auto \
-  --out results/hat_synthetic
-```
 
 ## QMD Versus Markdown
 

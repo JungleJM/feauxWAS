@@ -1,44 +1,14 @@
-# PheWAS Tutorial Assets
+# PheWAS Tutorial
 
-Start here:
+The method, end to end, on synthetic data shaped like the real Cosmos pulls. Start with `control-matching-tutorial.md`, which runs every step in order.
 
-- `control-matching-tutorial.md`: plain-English guide to HaT controls, matching variables, MatchIt usage, and YAML structure.
-- `hat-control-recipe.yaml`: fill-in recipe that points to parquet files with alias-based column references like `p.PatientSex`.
-- `make_synthetic_hat_parquets.py`: regenerates the fake parquet examples.
-- `synthetic_parquets/`: fake HaT cases, non-HaT pools, candidate-control ratio files, diagnosis events, and example 4:1 matches.
-- `why-and-how-for-phewas.md`: the earlier PheWAS overview moved into this tutorial folder.
-- `matchit_example.R`: runnable MatchIt example using the synthetic match-ready cohort.
-- `prepare_phewas_inputs.py`: turns the matched cohort and diagnosis events into pheauxWAS CSVs, dropping the HaT code and keeping one time window (pre/post/all index).
+- `control-matching-tutorial.md`: the walkthrough: pulls, one row per patient, matching, PheWAS inputs, PheWAS.
+- `why-and-how-for-phewas.md`: what a PheWAS is, the two tools (pheauxWAS and pyPheWAS), and their options.
+- `make_synthetic_cosmos_parquets.py`: writes the fake pulls to `synthetic_cosmos/hat/` and `synthetic_cosmos/ctrl/`.
+- `adapting-cosmos/`: the script that turns a pull into a group's parquets, its walkthrough, and the control pull's YAML. This is what runs on the VM.
+- `matchit_example.R`: MatchIt, 10 controls per case.
+- `prepare_phewas_inputs.py`: drops the exposure code and keeps one time window, for pheauxWAS.
+- `pulling-cohorts/`: the HaT pull's intake and the SSMS profile queries.
+- `work/`, `results/`: what the steps write.
 
-Regenerate synthetic files:
-
-``` bash
-python3 tutorial/make_synthetic_hat_parquets.py
-```
-
-Run the MatchIt example from the repo root:
-
-``` bash
-Rscript tutorial/matchit_example.R
-```
-
-Prepare inputs and run the PheWAS, once per window (`pre`, then `post`):
-
-``` bash
-python3 tutorial/prepare_phewas_inputs.py \
-  --cohort tutorial/synthetic_parquets/matchit_4to1_matched.parquet \
-  --events tutorial/synthetic_parquets/diagnosis_events.parquet \
-  --window pre --lookback-years 3 --out-dir tutorial/work
-
-python3 pheauxWAS/pheauxWAS.py \
-  --people tutorial/work/hat_people_matched.csv --id-col Patient_ID \
-  --predictors HaT_Flag \
-  --covars AgeAtIndex Sex Race Ethnicity YearsBeforeIndex ClinicVisitCountPreIndex \
-  --sex-col Sex \
-  --events tutorial/work/hat_diagnosis_events_pre.csv --events-id-col Patient_ID \
-  --code-col DiagnosisCode --vocab-col Vocabulary --date-col DiagnosisDate \
-  --map phecode/phecodeX_ICD_CM_map_flat.csv --definitions phecode/phecodeX_info.csv \
-  --out tutorial/results/hat_phewas_pre
-```
-
-The Python scripts need `pandas` and `pyarrow` (for example `uv run --with pandas --with pyarrow python ...`).
+The Python scripts need pandas and pyarrow, for example `uv run --with pandas --with pyarrow python ...`.

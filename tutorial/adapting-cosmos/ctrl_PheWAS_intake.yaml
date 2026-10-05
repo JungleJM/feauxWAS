@@ -1,0 +1,692 @@
+# HaT PheWAS, part 2: the control pool, as a Telescope intake.
+# Same tables and columns as the hat_ pull (reference/hat_cosmos_blueprint.yaml),
+# with ctrl_Patients as the PK. Why it's drawn this way: reference/plan/decisions.md,
+# D30. Before running:
+#   - hat_patient_keys.parquet (written by build_group_parquet.py on the hat_ pull)
+#     goes beside this file: the PK excludes those patients.
+#   - pool_permille thins Cosmos to that many patients per 1,000 before sampling;
+#     stop_at_for_pk_table (under smallset) caps the pool at 300,000. If the pool
+#     comes back under 300,000, raise pool_permille.
+#   - project_db: check it is the one to use.
+cosmos_vars:
+  project_db: PROJECTD93A5E7
+  cosmos_db: Dual
+run_vars:
+  min_date_key: 20150101
+  max_date_key: 20260601
+test_options:
+  smallset: true
+  stop_at_for_pk_table: 300000
+  random_pk_sample: true
+project_vars:
+  project_folder: HaT PheWAS Controls
+vars:
+  control_index_start: 20211001
+  pool_permille: 10
+upload_cohorts:
+- name: HatPatientKeys
+  dest_table: HatPatientKeys
+  file_type: parquet
+  file_loc: hat_patient_keys.parquet
+  pending_transfer: true
+  push_this_cycle: true
+  columns:
+  - name: PatientDurableKey
+    type: BIGINT
+multipliers: []
+batching:
+- chunk: 2000
+cohorts:
+- name: ctrl_Patients
+  dest_table: ctrl_Patients
+  type: pk
+  pull_this_cycle: true
+  description: 'Control pool: patients with no D89.44, each at one random completed Office Visit or Follow-Up
+    from 2021-10-01 (the pseudo-index), with age and every PatientDim column. A hash of the patient key
+    keeps about pool_permille per 1,000 patients; stop_at_for_pk_table caps the pool, ordered by a hash
+    of the key.
+
+    '
+  granularity: One row per patient, at one random clinic visit.
+  dedup_keys:
+  - - PatientDurableKey
+  dedup_order_by:
+  - RandomOrder
+  columns:
+  - source: ef.PatientDurableKey
+    name: PatientDurableKey
+    nullable: false
+  - source: ef.DateKey
+    name: IndexDate
+    nullable: false
+    description: 'DateKey (YYYYMMDD) of the sampled clinic visit: the pseudo-index date.'
+  - source: ef.EncounterKey
+    name: IndexEncounterKey
+    nullable: false
+  - source: ef.DerivedEncounterType_X
+    name: IndexEncounterType
+    nullable: true
+  - source: ef.AgeKey
+    name: IndexAgeKey
+    nullable: true
+  - source: dep.DepartmentSpecialty
+    name: IndexDepartmentSpecialty
+    nullable: true
+  - source: ABS(CHECKSUM(ef.EncounterKey))
+    name: RandomOrder
+    nullable: true
+    description: 'A hash of the encounter: picks one visit per patient at random, the same on every run.'
+    type: INT
+  - source: dur.Years
+    name: AgeAtIndex
+    nullable: true
+    description: Age in years at the sampled clinic visit (AgeKey through DurationDim).
+  - source: dur.Days
+    name: AgeAtIndexDays
+    nullable: true
+  - source: dur.DaysDisplayString
+    name: AgeAtIndexDaysDisplayString
+    nullable: true
+  - source: dur.DisplayString
+    name: AgeAtIndexDisplayString
+    nullable: true
+  - source: dur.Months
+    name: AgeAtIndexMonths
+    nullable: true
+  - source: dur.MonthsDisplayString
+    name: AgeAtIndexMonthsDisplayString
+    nullable: true
+  - source: dur.Weeks
+    name: AgeAtIndexWeeks
+    nullable: true
+  - source: dur.WeeksDisplayString
+    name: AgeAtIndexWeeksDisplayString
+    nullable: true
+  - source: dur.YearsDisplayString
+    name: AgeAtIndexYearsDisplayString
+    nullable: true
+  - source: p._IsDeleted
+    name: PatientIsDeleted
+    nullable: false
+  - source: p._IsInferred
+    name: PatientIsInferred
+    nullable: false
+  - source: p.AgeInYears
+    name: AgeInYears
+    nullable: true
+  - source: p.BirthDate
+    name: BirthDate
+    nullable: true
+  - source: p.BirthDateAccuracy_X
+    name: BirthDateAccuracy_X
+    nullable: true
+  - source: p.EarliestPossibleBirthDate_X
+    name: EarliestPossibleBirthDate_X
+    nullable: true
+  - source: p.BloodType_X
+    name: BloodType_X
+    nullable: true
+  - source: p.BloodTypeAndRhesusFactor_X
+    name: BloodTypeAndRhesusFactor_X
+    nullable: true
+  - source: p.Country
+    name: Country
+    nullable: true
+  - source: p.DeathDate
+    name: DeathDate
+    nullable: true
+    description: Ends observation early for patients who died.
+  - source: p.Ethnicity
+    name: Ethnicity
+    nullable: true
+  - source: p.FifthRace
+    name: FifthRace
+    nullable: true
+  - source: p.FirstRace
+    name: FirstRace
+    nullable: true
+  - source: p.FourthRace
+    name: FourthRace
+    nullable: true
+  - source: p.GenderIdentity
+    name: GenderIdentity
+    nullable: true
+  - source: p.HasPcp_X
+    name: HasPcp_X
+    nullable: true
+  - source: p.IsCurrent
+    name: IsCurrent
+    nullable: false
+  - source: p.IsValid
+    name: IsValid
+    nullable: false
+  - source: p.LastImmunizationQueryInstantUtc
+    name: LastImmunizationQueryInstantUtc
+    nullable: true
+  - source: p.MaritalStatus
+    name: MaritalStatus
+    nullable: true
+  - source: p.MultiRacial
+    name: MultiRacial
+    nullable: true
+  - source: p.PreferredLanguage
+    name: PreferredLanguage
+    nullable: true
+  - source: p.PreliminaryCauseOfDeathDiagnosisKey
+    name: PreliminaryCauseOfDeathDiagnosisKey
+    nullable: true
+  - source: p.PrimaryRUCA_X
+    name: PrimaryRUCA_X
+    nullable: true
+  - source: p.ReliableSex
+    name: ReliableSex
+    nullable: true
+  - source: p.RhesusFactor_X
+    name: RhesusFactor_X
+    nullable: true
+  - source: p.SecondRace
+    name: SecondRace
+    nullable: true
+  - source: p.Sex
+    name: Sex
+    nullable: true
+  - source: p.SexAssignedAtBirth
+    name: SexAssignedAtBirth
+    nullable: true
+  - source: p.SourceComboKey_X
+    name: SourceComboKey_X
+    nullable: true
+  - source: p.SourceCountry_X
+    name: SourceCountry_X
+    nullable: true
+  - source: p.StateOrProvince
+    name: StateOrProvince
+    nullable: true
+  - source: p.StateOrProvinceAbbreviation
+    name: StateOrProvinceAbbreviation
+    nullable: true
+  - source: p.Status
+    name: PatientStatus
+    nullable: true
+  - source: p.SviHouseholdCharacteristicsPctlRankByZip2020_X
+    name: SviHouseholdCharacteristicsPctlRankByZip2020_X
+    nullable: true
+  - source: p.SviHouseholdCompositionPctlRankingByZip2018_X
+    name: SviHouseholdCompositionPctlRankingByZip2018_X
+    nullable: true
+  - source: p.SviHousingTypeTransportationPctlRankByZip2020_X
+    name: SviHousingTypeTransportationPctlRankByZip2020_X
+    nullable: true
+  - source: p.SviHousingTypeTransportationPctlRankingByZip2018_X
+    name: SviHousingTypeTransportationPctlRankingByZip2018_X
+    nullable: true
+  - source: p.SviMinorityStatusLanguagePctlRankingByZip2018_X
+    name: SviMinorityStatusLanguagePctlRankingByZip2018_X
+    nullable: true
+  - source: p.SviOverallPctlRankByZip2020_X
+    name: SviOverallPctlRankByZip2020_X
+    nullable: true
+  - source: p.SviOverallPctlRankingByZip2018_X
+    name: SviOverallPctlRankingByZip2018_X
+    nullable: true
+  - source: p.SviRacialEthnicMinorityStatusPctlRankByZip2020_X
+    name: SviRacialEthnicMinorityStatusPctlRankByZip2020_X
+    nullable: true
+  - source: p.SviSocioeconomicPctlRankByZip2020_X
+    name: SviSocioeconomicPctlRankByZip2020_X
+    nullable: true
+  - source: p.SviSocioeconomicPctlRankingByZip2018_X
+    name: SviSocioeconomicPctlRankingByZip2018_X
+    nullable: true
+  - source: p.ThirdRace
+    name: ThirdRace
+    nullable: true
+  - source: p.UseInCosmosAnalytics_X
+    name: UseInCosmosAnalytics_X
+    nullable: false
+  filter:
+    from:
+    - EncounterFact as ef
+    join:
+    - INNER JOIN PatientDim AS p ON p.DurableKey = ef.PatientDurableKey
+    - LEFT JOIN DurationDim AS dur ON dur.DurationKey = ef.AgeKey
+    - LEFT JOIN DepartmentDim AS dep ON dep.DepartmentKey = ef.DepartmentKey
+    where:
+    - ef._IsDeleted = 0
+    - ef.DateKey BETWEEN {{control_index_start}} AND {{max_date_key}}
+    - ef.DerivedEncounterStatus = 'Complete'
+    - ef.DerivedEncounterType_X IN ('Office Visit', 'Follow-Up')
+    - ABS(CHECKSUM(ef.PatientDurableKey)) % 1000 < {{pool_permille}}
+    - ef.PatientDurableKey NOT IN (SELECT [PatientDurableKey] FROM {{prefix}}_HatPatientKeys)
+    - p._IsDeleted = 0
+    - p.IsCurrent = 1
+    - p.IsValid = 1
+    - p.UseInCosmosAnalytics_X = 1
+- name: ctrl_Encounters
+  dest_table: ctrl_Encounters
+  type: fact
+  pull_this_cycle: true
+  description: 'Every encounter for ctrl_Patients in the window, every EncounterFact column, and every
+    DepartmentDim column (DepartmentSpecialty) through a LEFT JOIN. Python derives first/last encounter
+    (observation start/end) and clinic-visit counts from it. A clinic visit is a distinct DateKey with
+    a completed Office Visit or Follow-Up.
+
+    '
+  granularity: One row per encounter.
+  dedup_keys:
+  - - EncounterKey
+  dedup_order_by:
+  - EncounterKey
+  columns:
+  - source: ef.PatientDurableKey
+    name: PatientDurableKey
+    nullable: false
+  - source: ef.EncounterKey
+    name: EncounterKey
+    nullable: false
+  - source: ef.DateKey
+    name: DateKey
+    nullable: false
+  - source: ef._IsDeleted
+    name: IsDeleted
+    nullable: false
+  - source: ef._IsInferred
+    name: IsInferred
+    nullable: false
+  - source: ef.AdmissionDateKey
+    name: AdmissionDateKey
+    nullable: true
+  - source: ef.AdmissionInstant
+    name: AdmissionInstant
+    nullable: true
+  - source: ef.AdmittingProviderDurableKey
+    name: AdmittingProviderDurableKey
+    nullable: true
+  - source: ef.AgeKey
+    name: AgeKey
+    nullable: true
+  - source: ef.ArrivalMeans
+    name: ArrivalMeans
+    nullable: true
+  - source: ef.AttendingProviderDurableKey
+    name: AttendingProviderDurableKey
+    nullable: true
+  - source: ef.CodingComplete_X
+    name: CodingComplete_X
+    nullable: true
+  - source: ef.CodingStatus_X
+    name: CodingStatus_X
+    nullable: true
+  - source: ef.Count
+    name: Count
+    nullable: false
+  - source: ef.CoverageComboKey_X
+    name: CoverageComboKey_X
+    nullable: true
+  - source: ef.Date
+    name: Date
+    nullable: true
+  - source: ef.DepartmentKey
+    name: DepartmentKey
+    nullable: true
+  - source: ef.DerivedEncounterStatus
+    name: DerivedEncounterStatus
+    nullable: true
+  - source: ef.DerivedEncounterType_X
+    name: DerivedEncounterType_X
+    nullable: true
+  - source: ef.DischargeDateKey
+    name: DischargeDateKey
+    nullable: true
+  - source: ef.DischargeDisposition
+    name: DischargeDisposition
+    nullable: true
+  - source: ef.DischargeInstant
+    name: DischargeInstant
+    nullable: true
+  - source: ef.DischargeProviderDurableKey
+    name: DischargeProviderDurableKey
+    nullable: true
+  - source: ef.EndDateKey
+    name: EndDateKey
+    nullable: true
+  - source: ef.EndInstant
+    name: EndInstant
+    nullable: true
+  - source: ef.IsEdVisit
+    name: IsEdVisit
+    nullable: true
+  - source: ef.IsHospitalAdmission
+    name: IsHospitalAdmission
+    nullable: true
+  - source: ef.IsHospitalOutpatientVisit
+    name: IsHospitalOutpatientVisit
+    nullable: true
+  - source: ef.IsOutpatientFaceToFaceVisit
+    name: IsOutpatientFaceToFaceVisit
+    nullable: true
+  - source: ef.IsPregnant_X
+    name: IsPregnant_X
+    nullable: true
+  - source: ef.MarkedDoNotBillInsurance
+    name: MarkedDoNotBillInsurance
+    nullable: true
+  - source: ef.MarkedSelfPay
+    name: MarkedSelfPay
+    nullable: true
+  - source: ef.PayorComboKey_X
+    name: PayorComboKey_X
+    nullable: true
+  - source: ef.PlaceOfServiceType_X
+    name: PlaceOfServiceType_X
+    nullable: true
+  - source: ef.PrimaryCoverageFinancialClass_X
+    name: PrimaryCoverageFinancialClass_X
+    nullable: true
+  - source: ef.PrimaryPayorKey_X
+    name: PrimaryPayorKey_X
+    nullable: true
+  - source: ef.ProviderDurableKey
+    name: ProviderDurableKey
+    nullable: true
+  - source: ef.SourceComboKey
+    name: SourceComboKey
+    nullable: true
+  - source: ef.Type
+    name: EncounterType
+    nullable: true
+  - source: dep.DepartmentSpecialty
+    name: DepartmentSpecialty
+    nullable: true
+  - source: dep.Country
+    name: DepartmentCountry
+    nullable: true
+  - source: dep.SiteFullyUsableInCosmosStartDateKey_X
+    name: SiteFullyUsableInCosmosStartDateKey_X
+    nullable: true
+  - source: dep.SiteFullyUsableInCosmosEndDateKey_X
+    name: SiteFullyUsableInCosmosEndDateKey_X
+    nullable: true
+  - source: dep._IsDeleted
+    name: DepartmentIsDeleted
+    nullable: true
+    description: Not filtered, so encounters keep their department either way.
+  - source: dep._IsInferred
+    name: DepartmentIsInferred
+    nullable: true
+  filter:
+    from:
+    - EncounterFact as ef
+    join:
+    - INNER JOIN {{prefix}}_ctrl_Patients AS pk ON pk.PatientDurableKey = ef.PatientDurableKey
+    - LEFT JOIN DepartmentDim AS dep ON dep.DepartmentKey = ef.DepartmentKey
+    where:
+    - ef._IsDeleted = 0
+    - ef.DateKey BETWEEN {{min_date_key}} AND {{max_date_key}}
+- name: ctrl_Diagnoses
+  dest_table: ctrl_Diagnoses
+  type: fact
+  pull_this_cycle: true
+  description: 'Every ICD-10-CM diagnosis event for ctrl_Patients in the window, every DiagnosisEventFact
+    and DiagnosisTerminologyDim column, so Python can filter (e.g. ruled-out) before collapsing to one
+    row per patient, code and date. The PheWAS event table. Any D89.44 here marks a control the builder
+    drops.
+
+    '
+  granularity: One row per diagnosis event and code.
+  dedup_keys:
+  - - DiagnosisEventKey
+    - DiagnosisCode
+  dedup_order_by:
+  - DiagnosisEventKey
+  columns:
+  - source: def.PatientDurableKey
+    name: PatientDurableKey
+    nullable: false
+  - source: def.StartDateKey
+    name: DiagnosisDate
+    nullable: true
+  - source: dt.Value
+    name: DiagnosisCode
+    nullable: true
+  - source: dt.Type
+    name: Vocabulary
+    nullable: true
+  - source: def.DiagnosisEventKey
+    name: DiagnosisEventKey
+    nullable: false
+  - source: def.EncounterKey
+    name: EncounterKey
+    nullable: true
+  - source: def._IsDeleted
+    name: IsDeleted
+    nullable: false
+  - source: def._IsInferred
+    name: IsInferred
+    nullable: false
+  - source: def.AgeKey
+    name: AgeKey
+    nullable: true
+  - source: def.Chronic
+    name: Chronic
+    nullable: true
+  - source: def.Count
+    name: Count
+    nullable: false
+  - source: def.DiagnosisKey
+    name: DiagnosisKey
+    nullable: false
+  - source: def.DocumentedInstant_X
+    name: DocumentedInstant_X
+    nullable: true
+  - source: def.EndDateKey
+    name: EndDateKey
+    nullable: true
+  - source: def.EmergencyDepartmentDiagnosis
+    name: EmergencyDepartmentDiagnosis
+    nullable: true
+  - source: def.IsPrimary
+    name: IsPrimary
+    nullable: true
+  - source: def.NotedDateKey_X
+    name: NotedDateKey_X
+    nullable: true
+  - source: def.PresentOnAdmission
+    name: PresentOnAdmission
+    nullable: true
+  - source: def.SourceComboKey
+    name: SourceComboKey
+    nullable: true
+  - source: def.Status
+    name: DiagnosisStatus
+    nullable: true
+  - source: def.Type
+    name: DiagnosisType
+    nullable: true
+  - source: dt._IsDeleted
+    name: TerminologyIsDeleted
+    nullable: false
+  - source: dt._IsInferred
+    name: TerminologyIsInferred
+    nullable: false
+  - source: dt.DiagnosisTerminologyKey
+    name: DiagnosisTerminologyKey
+    nullable: false
+  - source: dt.DisplayString
+    name: DisplayString
+    nullable: true
+  - source: dt.GroupedNameAndCode
+    name: GroupedNameAndCode
+    nullable: true
+  - source: dt.NameAndCode
+    name: NameAndCode
+    nullable: true
+  - source: dt.ReferenceBillingCode
+    name: ReferenceBillingCode
+    nullable: true
+  - source: dt.Parent
+    name: Parent
+    nullable: true
+  - source: dt.TerminologyConceptKey
+    name: TerminologyConceptKey
+    nullable: true
+  filter:
+    from:
+    - DiagnosisEventFact as def
+    join:
+    - INNER JOIN {{prefix}}_ctrl_Patients AS pk ON pk.PatientDurableKey = def.PatientDurableKey
+    - INNER JOIN DiagnosisTerminologyDim AS dt ON dt.DiagnosisKey = def.DiagnosisKey
+    where:
+    - def._IsDeleted = 0
+    - def.StartDateKey BETWEEN {{min_date_key}} AND {{max_date_key}}
+    - dt._IsDeleted = 0
+    - dt.Type = 'ICD-10-CM'
+- name: ctrl_Labs
+  dest_table: ctrl_Labs
+  type: fact
+  pull_this_cycle: true
+  description: "Every tryptase result for ctrl_Patients in the window: every LabComponentResultFact column\
+    \ and every LabComponentDim column (LEFT JOIN). Filtered to the eight tryptase LabComponentKeys found\
+    \ on the VM (2026-10-02, LabComponentDim names, common names, base names or LOINC names like '%tryptase%'),\
+    \ all of them kept:\n  2287  Tryptase SerPl-mCnc (mass/volume, LOINC 21582-2; the usual baseline test)\n\
+    \  8166  Tryptase IgE Qn (IgE antibody to tryptase, 7748-7; not a tryptase level)\n  16740 Tryptase.beta\
+    \ SerPl-mCnc (60539-4)\n  51583 Tryptase Fld-mCnc (body fluid, 45334-0)\n  59082 INACTIVE Tryptase\
+    \ (no LOINC; DefaultUnit ng/mL)\n  75051 Tryptase SerPl-cCnc (enzymatic activity, 12733-2)\n  86072\
+    \ Tryptase.mature SerPl-cCnc (enzymatic activity, 41870-7)\n  91367 Tryptase SerPl-sCnc (moles/volume,\
+    \ 51834-0)\nPython validates cases (baseline tryptase above about 8 ng/mL) and, later, screens controls.\n"
+  granularity: One row per lab component result.
+  dedup_keys:
+  - - LabComponentResultKey
+  dedup_order_by:
+  - LabComponentResultKey
+  columns:
+  - source: lcrf.PatientDurableKey
+    name: PatientDurableKey
+    nullable: false
+  - source: lcrf.LabComponentResultKey
+    name: LabComponentResultKey
+    nullable: false
+  - source: lcrf.LabComponentKey
+    name: LabComponentKey
+    nullable: false
+  - source: lcrf.PrioritizedDateKey
+    name: PrioritizedDateKey
+    nullable: true
+  - source: lcrf.Value
+    name: Value
+    nullable: false
+  - source: lcrf.NumericValue
+    name: NumericValue
+    nullable: true
+  - source: lcrf.Unit
+    name: Unit
+    nullable: true
+  - source: lcrf._IsDeleted
+    name: IsDeleted
+    nullable: false
+  - source: lcrf._IsInferred
+    name: IsInferred
+    nullable: false
+  - source: lcrf.Abnormal
+    name: Abnormal
+    nullable: true
+  - source: lcrf.CollectionInstant
+    name: CollectionInstant
+    nullable: true
+  - source: lcrf.Count
+    name: Count
+    nullable: false
+  - source: lcrf.EncounterKey
+    name: EncounterKey
+    nullable: true
+  - source: lcrf.Flag
+    name: Flag
+    nullable: true
+  - source: lcrf.IsBlankOrUnsuccessfulAttempt
+    name: IsBlankOrUnsuccessfulAttempt
+    nullable: true
+  - source: lcrf.LabTestKey_X
+    name: LabTestKey_X
+    nullable: true
+  - source: lcrf.NumericBoundaryValue_X
+    name: NumericBoundaryValue_X
+    nullable: true
+  - source: lcrf.NumericValueMaximum_X
+    name: NumericValueMaximum_X
+    nullable: true
+  - source: lcrf.NumericValueMinimum_X
+    name: NumericValueMinimum_X
+    nullable: true
+  - source: lcrf.PrioritizedInstant_X
+    name: PrioritizedInstant_X
+    nullable: true
+  - source: lcrf.ProcedureDurableKey
+    name: ProcedureDurableKey
+    nullable: true
+  - source: lcrf.ReferenceValueHigh_X
+    name: ReferenceValueHigh_X
+    nullable: false
+  - source: lcrf.ReferenceValueLow_X
+    name: ReferenceValueLow_X
+    nullable: true
+  - source: lcrf.ReferenceValueNormal_X
+    name: ReferenceValueNormal_X
+    nullable: true
+  - source: lcrf.ResultingLabDurableKey
+    name: ResultingLabDurableKey
+    nullable: true
+  - source: lcrf.ResultInstant
+    name: ResultInstant
+    nullable: true
+  - source: lcrf.SourceComboKey
+    name: SourceComboKey
+    nullable: true
+  - source: lcrf.StructuredBoundaryOperator_X
+    name: StructuredBoundaryOperator_X
+    nullable: true
+  - source: lcd._IsDeleted
+    name: ComponentIsDeleted
+    nullable: true
+  - source: lcd._IsInferred
+    name: ComponentIsInferred
+    nullable: true
+  - source: lcd.Abbreviation
+    name: Abbreviation
+    nullable: true
+  - source: lcd.BaseName
+    name: BaseName
+    nullable: true
+  - source: lcd.CommonName
+    name: CommonName
+    nullable: true
+  - source: lcd.DataType
+    name: ComponentDataType
+    nullable: true
+  - source: lcd.DefaultUnit
+    name: DefaultUnit
+    nullable: true
+  - source: lcd.LoincCode
+    name: LoincCode
+    nullable: true
+  - source: lcd.LoincName
+    name: LoincName
+    nullable: true
+  - source: lcd.Name
+    name: ComponentName
+    nullable: true
+  - source: lcd.Subtype
+    name: ComponentSubtype
+    nullable: true
+  - source: lcd.Type
+    name: ComponentType
+    nullable: true
+  filter:
+    from:
+    - LabComponentResultFact as lcrf
+    join:
+    - INNER JOIN {{prefix}}_ctrl_Patients AS pk ON pk.PatientDurableKey = lcrf.PatientDurableKey
+    - LEFT JOIN LabComponentDim AS lcd ON lcd.LabComponentKey = lcrf.LabComponentKey
+    where:
+    - lcrf._IsDeleted = 0
+    - lcrf.PrioritizedDateKey BETWEEN {{min_date_key}} AND {{max_date_key}}
+    - lcrf.LabComponentKey IN (2287, 8166, 16740, 51583, 59082, 75051, 86072, 91367)

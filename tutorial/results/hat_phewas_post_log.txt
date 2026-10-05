@@ -1,37 +1,37 @@
-[08:59:46] pheauxWAS 1.1.0 | Python 3.13.5 | numpy 2.5.3 | macOS-15.7.7-arm64-arm-64bit-Mach-O
-[08:59:46] script sha256: b5527ce859ee961a9ce316cf31d29b2aaa2904de6d0e4fd0682baee755d45ceb
-[08:59:46] command: pheauxWAS/pheauxWAS.py --people tutorial/work/hat_people_matched.csv --id-col Patient_ID --predictors HaT_Flag --covars AgeAtIndex Sex Race Ethnicity YearsBeforeIndex ClinicVisitCountPreIndex --sex-col Sex --events tutorial/work/hat_diagnosis_events_post.csv --events-id-col Patient_ID --code-col DiagnosisCode --vocab-col Vocabulary --date-col DiagnosisDate --map phecode/phecodeX_ICD_CM_map_flat.csv --definitions phecode/phecodeX_info.csv --min-code-count 2 --min-cases 20 --out tutorial/results/hat_phewas_post
-[08:59:46] input sha256 22b06c97414bd2a11596e94cc98613d30def7913ff016bb9f625b29e340208ea  tutorial/work/hat_people_matched.csv
-[08:59:46] input sha256 7f38adf18e2e459383d803c61f6cba0e8d6410e3d579a84298a4e676ae22e435  tutorial/work/hat_diagnosis_events_post.csv
-[08:59:46] input sha256 773a560c1d60de20dc1fba96c9ffe1e04d533b494570361dbe6bfdf32e47e5ac  phecode/phecodeX_ICD_CM_map_flat.csv
-[08:59:46] input sha256 70198d06b2e87ae0204336de5eca54deced2630308231614e1820e72d82103c3  phecode/phecodeX_info.csv
-[08:59:46] definitions phecode/phecodeX_info.csv: 3690 rows
-[08:59:46] map phecode/phecodeX_ICD_CM_map_flat.csv: 80400 code->phecode rows
-[08:59:46] people tutorial/work/hat_people_matched.csv: 769 individuals
-[08:59:46] events tutorial/work/hat_diagnosis_events_post.csv: id='Patient_ID' code='DiagnosisCode' vocab='Vocabulary'; counting = distinct values of 'DiagnosisDate' per person and phecode
-[08:59:46] events: 4190 rows, 4190 for people in the study population, 4190 mapped to a phecode (100.0% of population rows)
-[08:59:46] 13 phecodes observed; 769 of 769 people (100.0%) have at least one mapped code
-[08:59:46] WARNING: no exclusion criteria found in the maps/definitions; controls may include people with closely related phecodes
-[08:59:46] sex from 'Sex': 279 male, 490 female, 0 other/missing
-[08:59:46] covariate AgeAtIndex: numeric, 0 missing
-[08:59:46] covariate Sex: categorical, reference='Female', levels=['Female', 'Male'], 0 missing
-[08:59:46] covariate Race: categorical, reference='White', levels=['White', 'Black', 'Other', 'Unknown', 'Asian'], 0 missing
-[08:59:46] covariate Ethnicity: categorical, reference='Not Hispanic or Latino', levels=['Not Hispanic or Latino', 'Unknown', 'Hispanic or Latino'], 0 missing
-[08:59:46] covariate YearsBeforeIndex: numeric, 0 missing
-[08:59:46] covariate ClinicVisitCountPreIndex: numeric, 0 missing
-[08:59:46] predictor HaT_Flag: numeric, 0 missing
-[08:59:46] complete cases for HaT_Flag: 769 of 769
-[08:59:46] HaT_Flag: 13 phecodes tested (0 with Firth); 6 Bonferroni-significant, 7 FDR<0.05
-[08:59:46]    DE_666   OR=8.58     p=4.49e-15   cases=79      Urticaria
-[08:59:46]    SS_807   OR=2.89     p=3.09e-05   cases=107     Malaise and fatigue
-[08:59:46]    GI_527   OR=2.49     p=0.000522   cases=88      Abdominal pain
-[08:59:46]    CV_401   OR=0.388    p=0.00179    cases=117     Hypertension
-[08:59:46]    CV_401.1 OR=0.388    p=0.00179    cases=117     Essential hypertension
-[08:59:46]    MB_288   OR=2.35     p=0.00373    cases=66      Anxiety and anxiety disorders
-[08:59:46]    EM_239   OR=0.396    p=0.0155     cases=67      Hyperlipidemia
-[08:59:46]    RE_475   OR=0.536    p=0.101      cases=63      Asthma
-[08:59:46]    NS_331   OR=1.24     p=0.466      cases=74      Headache
-[08:59:46]    NS_331.6 OR=1.24     p=0.466      cases=74      Migraine
-[08:59:46] wrote tutorial/results/hat_phewas_post_HaT_Flag_manhattan.svg
-[08:59:46] wrote tutorial/results/hat_phewas_post_results.csv
-[08:59:46] finished in 0.2 s
+[01:03:57] pheauxWAS 1.1.0 | Python 3.13.5 | numpy 2.5.3 | macOS-15.7.7-arm64-arm-64bit-Mach-O
+[01:03:57] script sha256: b5527ce859ee961a9ce316cf31d29b2aaa2904de6d0e4fd0682baee755d45ceb
+[01:03:57] command: pheauxWAS/pheauxWAS.py --people tutorial/work/people_matched.csv --id-col PatientDurableKey --predictors HaT_Flag --covars AgeAtIndex Sex Race Ethnicity YearsBeforeIndex ClinicVisits365Before --sex-col Sex --events tutorial/work/diagnosis_events_post.csv --events-id-col PatientDurableKey --code-col DiagnosisCode --vocab-col Vocabulary --date-col DiagnosisDate --map phecode/phecodeX_ICD_CM_map_flat.csv --definitions phecode/phecodeX_info.csv --out tutorial/results/hat_phewas_post
+[01:03:57] input sha256 d97eabea705928ec32c5b3fdf122cb4e6807b1a6d12fcb4f248be3822450aa6f  tutorial/work/people_matched.csv
+[01:03:57] input sha256 d5dc2c46337ac162aa90233c367905d4949791605de4d71712a36213d7d3bd1a  tutorial/work/diagnosis_events_post.csv
+[01:03:57] input sha256 773a560c1d60de20dc1fba96c9ffe1e04d533b494570361dbe6bfdf32e47e5ac  phecode/phecodeX_ICD_CM_map_flat.csv
+[01:03:57] input sha256 70198d06b2e87ae0204336de5eca54deced2630308231614e1820e72d82103c3  phecode/phecodeX_info.csv
+[01:03:57] definitions phecode/phecodeX_info.csv: 3690 rows
+[01:03:57] map phecode/phecodeX_ICD_CM_map_flat.csv: 80400 code->phecode rows
+[01:03:57] people tutorial/work/people_matched.csv: 2799 individuals
+[01:03:57] events tutorial/work/diagnosis_events_post.csv: id='PatientDurableKey' code='DiagnosisCode' vocab='Vocabulary'; counting = distinct values of 'DiagnosisDate' per person and phecode
+[01:03:57] events: 14760 rows, 14760 for people in the study population, 14760 mapped to a phecode (100.0% of population rows)
+[01:03:57] 13 phecodes observed; 2725 of 2799 people (97.4%) have at least one mapped code
+[01:03:57] WARNING: no exclusion criteria found in the maps/definitions; controls may include people with closely related phecodes
+[01:03:57] sex from 'Sex': 627 male, 2172 female, 0 other/missing
+[01:03:57] covariate AgeAtIndex: numeric, 0 missing
+[01:03:57] covariate Sex: categorical, reference='Female', levels=['Female', 'Male'], 0 missing
+[01:03:57] covariate Race: categorical, reference='White', levels=['White', 'Black or African American', 'Unknown', 'Asian', 'Other Race'], 0 missing
+[01:03:57] covariate Ethnicity: categorical, reference='Not Hispanic or Latino', levels=['Not Hispanic or Latino', 'Unknown', 'Hispanic or Latino'], 0 missing
+[01:03:57] covariate YearsBeforeIndex: numeric, 0 missing
+[01:03:57] covariate ClinicVisits365Before: numeric, 0 missing
+[01:03:57] predictor HaT_Flag: numeric, 0 missing
+[01:03:57] complete cases for HaT_Flag: 2799 of 2799
+[01:03:57] HaT_Flag: 13 phecodes tested (0 with Firth); 8 Bonferroni-significant, 9 FDR<0.05
+[01:03:57]    DE_666   OR=5.69     p=3.26e-24   cases=208     Urticaria
+[01:03:57]    CV_401   OR=0.195    p=2.27e-09   cases=441     Hypertension
+[01:03:57]    CV_401.1 OR=0.195    p=2.27e-09   cases=441     Essential hypertension
+[01:03:57]    EM_239   OR=0.227    p=1.59e-07   cases=346     Hyperlipidemia
+[01:03:57]    NS_331   OR=0.444    p=0.000687   cases=313     Headache
+[01:03:57]    NS_331.6 OR=0.444    p=0.000687   cases=313     Migraine
+[01:03:57]    GI_527   OR=1.82     p=0.00124    cases=257     Abdominal pain
+[01:03:57]    MB_288   OR=1.72     p=0.0036     cases=254     Anxiety and anxiety disorders
+[01:03:57]    SS_807   OR=1.56     p=0.0055     cases=405     Malaise and fatigue
+[01:03:57]    RE_475   OR=0.686    p=0.093      cases=268     Asthma
+[01:03:57] wrote tutorial/results/hat_phewas_post_HaT_Flag_manhattan.svg
+[01:03:57] wrote tutorial/results/hat_phewas_post_results.csv
+[01:03:57] finished in 0.2 s

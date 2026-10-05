@@ -1,0 +1,18 @@
+control group, built from tutorial/synthetic_cosmos/ctrl
+read: 16,000 patients, 616,926 encounters, 374,401 diagnosis rows, 582 lab rows
+
+DiagnosisStatus values (dropped ones marked x):
+    Active: 318,285
+    Resolved: 37,348
+  x Ruled Out: 18,768
+diagnoses kept: 324,741 patient-code-date rows
+
+sex: {'Female': 8742, 'Male': 7258}
+race: {'White': 12358, 'Black or African American': 1305, 'Unknown': 1164, 'Asian': 664, 'Other Race': 509}
+ethnicity: {'Not Hispanic or Latino': 13544, 'Hispanic or Latino': 1312, 'Unknown': 1144}
+
+encounter statuses: {'Complete': 570421, 'Canceled': 29007, 'No Show': 17498}
+
+wrote control_group.parquet: 16,000 patients, 11,575 eligible for matching
+  not eligible: 4,425 with under 2 clinic visits in the year before index; 0 with no usable sex; 0 indexed before 2021-10-01
+wrote control_group_diagnoses.parquet: 324,741 rows

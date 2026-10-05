@@ -1,196 +1,116 @@
-# HaT Control Matching Tutorial
+# Cases, Controls And Matching: A Walkthrough
 
-This folder is a working sketch of what to collect before a HaT PheWAS. The synthetic parquets are fake, but the columns are deliberately shaped like a real extraction plan from a large medical database.
+How a PheWAS of one exposure (here HaT) goes from Cosmos pulls to results, on synthetic data shaped exactly like the real pulls. Every file and column below has the name the real data has, so the same steps run on the VM. This explains the *method*; the HaT study's own choices, and why, are in `reference/plan/design.md` and `decisions.md`.
 
-## Files In `synthetic_parquets`
-
-- `hat_patients.parquet`: known HaT cases, one row per patient.
-- `non_hat_patient_pool.parquet`: patients with no known HaT diagnosis, before matching.
-- `candidate_controls_4x.parquet`, `candidate_controls_8x.parquet`, `candidate_controls_20x.parquet`, `candidate_controls_50x.parquet`: increasingly large candidate control pools sampled from eligible non-HaT patients.
-- `match_ready_cohort.parquet`: HaT cases plus eligible non-HaT controls in one table, ready for MatchIt.
-- `example_4to1_matches.parquet`: example case-control links from a simple greedy match (an illustration of the file shape, not MatchIt).
-- `example_4to1_matched_cohort.parquet`: the cohort from that greedy match. The real matched cohort is `matchit_4to1_matched.parquet`, written by `matchit_example.R`.
-- `index_events.parquet`: the case diagnosis date or control pseudo-index date.
-- `diagnosis_events.parquet`: fake ICD-10-CM events for PheWAS, both before and after the index date. HaT cases also carry the real HaT code, `D89.44`.
-- `data_dictionary.csv`: short column explanations.
-
-Regenerate them with:
-
-``` bash
-python3 tutorial/make_synthetic_hat_parquets.py
+``` text
+make_synthetic_cosmos_parquets.py        fake pulls             synthetic_cosmos/hat/, synthetic_cosmos/ctrl/
+adapting-cosmos/build_group_parquet.py   one row per patient    hat_group.parquet, control_group.parquet (+ _diagnoses)
+matchit_example.R                        matching               work/matched_cohort.parquet
+prepare_phewas_inputs.py                 exposure code, window  work/people_matched.csv, work/diagnosis_events_<window>.csv
+pheauxWAS/pheauxWAS.py                   one model per phecode  results/hat_phewas_<window>_*
 ```
 
-## Must-Haves For Control Selection
+Run everything from the repo root. The Python scripts need pandas and pyarrow (`uv run --with pandas --with pyarrow python ...`); the R script installs what it needs.
 
-- Patient ID: a stable identifier present in patient, event, and diagnosis tables.
-- HaT flag: `1` for known HaT cases, `0` for no known HaT diagnosis.
-- Sex: use exact matching or exact strata.
-- Index date: HaT diagnosis/index date for cases; pseudo-index date for controls.
-- Age at index: use matching/caliper or strong covariate adjustment.
-- Observation time before index: require enough pre-index history, usually at least 1-2 years.
-- Observation time after index: require enough follow-up if post-index outcomes are included.
-- Utilization before index: clinic visits (in Cosmos, distinct dates with an outpatient face-to-face encounter). Not diagnosis count: in a pre-index PheWAS those diagnoses are the outcomes, and balancing on them removes part of the signal.
-- Race and ethnicity: adjust or balance if available and usable.
-- Diagnosis-event table: one row per ICD event, with patient ID, code, vocabulary, and date.
-- Repeat-diagnosis information: enough to require repeated diagnosis codes for case definitions and phenotypes.
+## 1. The Pulls
 
-## Good Optional Variables
+``` bash
+python3 tutorial/make_synthetic_cosmos_parquets.py
+```
 
-- Index year or index quarter: exact match on calendar time when possible.
-- ED visit and hospital admission counts, kept separate from clinic visits.
-- Prior mast-cell-related diagnosis flag: useful sensitivity variable, but be careful because it may partly mediate HaT recognition.
-- Medication or lab proxies: only if available broadly enough and not caused by the exposure definition.
-- Data-source/system flag: ideal if available, but you said physical location/source details are not available.
+Each group is one Telescope pull of four tables, joined by `PatientDurableKey`:
 
-## What I Would Use First
+| Table | One row per | Used for |
+|------------------|------------------|------------------------------|
+| `hat_Patients` / `ctrl_Patients` | patient | `IndexDate` (a DateKey like `20230517`), `AgeAtIndex`, `Sex`, `ReliableSex`, `FirstRace`, `MultiRacial`, `Ethnicity`, `BirthDate`, `DeathDate` |
+| `hat_Encounters` / `ctrl_Encounters` | encounter | `DateKey`, `DerivedEncounterStatus`, `DerivedEncounterType_X`, `IsEdVisit`, `IsHospitalAdmission` |
+| `hat_Diagnoses` / `ctrl_Diagnoses` | diagnosis event | `DiagnosisDate`, `DiagnosisCode`, `Vocabulary`, `DiagnosisStatus` |
+| `hat_Labs` / `ctrl_Labs` | lab result | `LabComponentKey`, `PrioritizedDateKey`, `NumericValue`, `Unit` |
 
-Use exact matching on:
+A case's `IndexDate` is their first HaT diagnosis. A control has no diagnosis to anchor on, so the control pull gives each one a **pseudo-index date**: one random clinic visit, drawn from the same years as the cases. Comparing diagnoses "in the 3 years before index" then means the same thing for both groups.
 
-- `Sex`
-- `IndexQuarter`, meaning same 3-month calendar period
+The real pulls take every column Cosmos offers; the synthetic ones keep only these.
 
-Then use nearest-neighbor or propensity-score matching on:
+## 2. One Row Per Patient
 
-- `AgeAtIndex`
-- `YearsBeforeIndex`
-- `YearsAfterIndex`
-- `ClinicVisitCountPreIndex`
-- `Race`
-- `Ethnicity`
+``` bash
+python3 tutorial/adapting-cosmos/build_group_parquet.py --dir tutorial/synthetic_cosmos/hat
+python3 tutorial/adapting-cosmos/build_group_parquet.py --dir tutorial/synthetic_cosmos/ctrl
+```
 
-I would start with a large control candidate pool, probably 20x or 50x the HaT case count if the database supports it. Then match down to 4:1 or 8:1. Larger final ratios are not automatically better: after about 4-8 controls per case, the gain in precision can be small, and poor extra controls can make balance worse.
+The builder turns each pull into two files: `<group>_group.parquet`, one row per patient, and `<group>_group_diagnoses.parquet`, one row per patient, code and date. `adapting-cosmos/README.md` walks through each step. The columns that matter next:
 
-## Plain-English Matching Workflow
+| Column | What it is |
+|------------------|------------------------------------|
+| `HaT_Flag` | 1 for the hat group, 0 for controls |
+| `IndexDate`, `IndexQuarter` | the index date, and its calendar quarter (`2023Q2`) |
+| `AgeAtIndex`, `Sex`, `Race`, `Ethnicity` | demographics; unknown values grouped as `Unknown` |
+| `YearsBeforeIndex`, `YearsAfterIndex` | record length on each side of index, from the first and last completed encounter |
+| `ClinicVisits365Before` | days with a completed Office Visit or Follow-Up in the year before index |
+| `EligibleForMatching` | 1 if the patient can be matched: two clinic visits in that year, a usable sex, and for cases an index from when the code existed |
+| `HaTDateCount`, `EarlierMastCellCode`, `TryptaseMax` | for checking and describing the cases |
 
-First, define the cases. Every known HaT patient gets `HaT_Flag = 1` and an `IndexDate`, usually the first reliable HaT diagnosis date or cohort-entry date.
+**Why clinic visits matter.** A patient who sees doctors more collects more diagnoses. HaT patients are often heavily worked up, so without balancing utilization, every diagnosis can look "associated with HaT". Visit counts are balanced; diagnosis counts are not, because before index those diagnoses are the outcomes being measured.
 
-Second, define the possible controls. These are not proven non-HaT; they are "no known HaT diagnosis." Remove anyone with a HaT diagnosis code or cohort flag. Require enough observation before the pseudo-index date, enough follow-up after it if needed, and enough clinical contact that they had a reasonable chance to accumulate diagnoses.
+## 3. Matching
 
-Third, assign each control a pseudo-index date. A simple approach is to sample or choose an eligible encounter date so the control index-date distribution resembles the case index-date distribution. The synthetic parquets use index quarter to represent the "same 3-month period" idea.
+``` bash
+Rscript tutorial/matchit_example.R
+```
 
-Fourth, create a match-ready table with cases and candidate controls in one row-per-patient file. That table should contain the exposure flag, exact-match variables, and balancing variables.
+The script stacks the two group files, keeps `EligibleForMatching == 1`, and matches:
 
-Fifth, run matching. For a first pass, match within exact sex and exact index quarter. Within those strata, find controls with similar age, observation time, and utilization. After matching, inspect balance. If age, utilization, race, or observation time are still imbalanced, tighten calipers, add exact strata, or lower the match ratio.
+``` r
+matchit(HaT_Flag ~ AgeAtIndex + YearsBeforeIndex + YearsAfterIndex +
+          log1p(ClinicVisits365Before) + Race + Ethnicity,
+        data = cohort, method = "nearest", distance = "glm",
+        exact = ~ Sex + IndexQuarter,
+        ratio = 10, replace = FALSE, caliper = 0.2, std.caliper = TRUE)
+```
 
-Sixth, prepare the PheWAS inputs with `prepare_phewas_inputs.py` (next section).
+How to read it:
 
-Seventh, use the matched cohort as the population table for the PheWAS. The PheWAS still creates phecode-specific outcome cases and controls internally; the matching step only defines the fairer HaT-vs-non-HaT study population.
+- `HaT_Flag ~ ...` lists what should look alike between the groups; MatchIt fits a logistic model of being a case on them (the propensity score).
+- `exact = ~ Sex + IndexQuarter`: a control must have the same sex and an index in the same 3-month period.
+- `ratio = 10`: up to 10 controls per case, each used once (`replace = FALSE`).
+- `caliper = 0.2, std.caliper = TRUE`: no control further than 0.2 standard deviations of the propensity score; a case with fewer than 10 close controls keeps fewer.
 
-## Preparing The PheWAS Inputs
+Then check it worked: `summary(match)` shows each variable's standardized mean difference, which should be under 0.1, and how many cases went unmatched; `work/matchit_balance_love_plot.png` draws the same. On the synthetic data, 328 of 350 eligible cases match, to 2,471 controls. If balance is poor or many cases go unmatched, the pool is too small for the busiest quarters, or quarter is too strict (year is the fallback).
 
-pheauxWAS tests every event it is given. Two decisions must be made before the events reach it:
+The output, `work/matched_cohort.parquet`, is the matched patients with every group column, plus MatchIt's `distance`, `weights` and `subclass` (the matched set).
 
-**Remove the exposure codes.** The code that defines HaT, `D89.44`, maps to phecode `GE_969.4` "Hereditary alpha tryptasemia". If it stays in, every case has it and no control does, so it comes back as the top hit (in the synthetic data: OR ≈ 100,000, p ≈ 10⁻¹⁷⁴), along with its parent `GE_969`. It is circular and says nothing. Drop every code used to define the cases.
-
-**Choose a time window.** Each event is kept or dropped based on its date relative to the patient's index date:
-
-- `pre`: before index. These are phenotypes present before HaT was diagnosed. Use this as the primary analysis, with `--lookback-years 3` so every patient gets the same 3-year window.
-- `post`: after index. HaT patients are worked up after diagnosis, so post-index hits can be surveillance rather than biology. Use it as a sensitivity analysis.
-- `all`: every event.
-
-The index day is in neither `pre` nor `post`, since codes entered on the diagnosis day are usually part of the HaT workup.
+## 4. Preparing The PheWAS Inputs
 
 ``` bash
 python3 tutorial/prepare_phewas_inputs.py \
-  --cohort tutorial/synthetic_parquets/matchit_4to1_matched.parquet \
-  --events tutorial/synthetic_parquets/diagnosis_events.parquet \
+  --cohort tutorial/work/matched_cohort.parquet \
+  --diagnoses tutorial/synthetic_cosmos/hat/hat_group_diagnoses.parquet \
+              tutorial/synthetic_cosmos/ctrl/control_group_diagnoses.parquet \
   --window pre --lookback-years 3 \
   --out-dir tutorial/work
 ```
 
-It writes `tutorial/work/hat_people_matched.csv` and `tutorial/work/hat_diagnosis_events_pre.csv`. Run it once per window, then run pheauxWAS on each events file. The synthetic data is built so the windows differ: urticaria and fatigue are enriched before index, and after index the effects are larger and abdominal pain and anxiety join them. That is the pattern a surveillance effect would produce.
+pheauxWAS tests every diagnosis it is given, so two things happen first:
 
-**Matched sets are not used in the regression.** MatchIt writes a `subclass` column (the matched set). pheauxWAS ignores it and runs ordinary logistic regression, adjusted for the covariates, on the matched cohort. This is common and defensible, but say so in the methods. A conditional logistic regression within matched sets is the stricter alternative.
+- **The exposure code goes.** D89.44 maps to phecode `GE_969.4` "Hereditary alpha tryptasemia". Every case has it and no control does, so left in, it is a guaranteed, meaningless top hit, with its parent phecode.
+- **One time window is kept**, by each diagnosis's `DaysFromIndex`. `pre` with `--lookback-years 3` keeps the 3 years before index, the same length for everyone: phenotypes present before HaT was diagnosed. `post` keeps what came after: larger effects there may be the workup that follows a diagnosis rather than HaT itself. The index day is in neither.
 
-## MatchIt In R
+Run it once per window. The synthetic data plants both patterns: urticaria and fatigue before index, more and larger effects after.
 
-MatchIt's default `matchit()` call does 1:1 nearest-neighbor matching on a propensity score estimated with logistic regression. For this use case, I would be more explicit: exact-match sex and index quarter, estimate propensity from age/observation/utilization/race/ethnicity, and request a fixed control ratio.
+## 5. The PheWAS
 
-Install/read parquet:
-
-``` r
-install.packages(c("MatchIt", "arrow", "cobalt", "dplyr"))
-
-library(MatchIt)
-library(arrow)
-library(cobalt)
-library(dplyr)
-
-cohort <- read_parquet("tutorial/synthetic_parquets/match_ready_cohort.parquet") |>
-  mutate(
-    HaT_Flag = as.integer(HaT_Flag),
-    Sex = factor(Sex),
-    Race = factor(Race),
-    Ethnicity = factor(Ethnicity),
-    IndexQuarter = factor(IndexQuarter)
-  )
+``` bash
+python3 pheauxWAS/pheauxWAS.py \
+  --people tutorial/work/people_matched.csv --id-col PatientDurableKey \
+  --predictors HaT_Flag \
+  --covars AgeAtIndex Sex Race Ethnicity YearsBeforeIndex ClinicVisits365Before \
+  --sex-col Sex \
+  --events tutorial/work/diagnosis_events_pre.csv --events-id-col PatientDurableKey \
+  --code-col DiagnosisCode --vocab-col Vocabulary --date-col DiagnosisDate \
+  --map phecode/phecodeX_ICD_CM_map_flat.csv --definitions phecode/phecodeX_info.csv \
+  --out tutorial/results/hat_phewas_pre
 ```
 
-Practical first-pass match:
+For each phecode, a patient is a phecode case with its codes on 2 or more distinct dates; patients with one date are left out of that phecode, and so are those with related phecodes or the wrong sex for it. Phecodes with fewer than 20 cases are skipped. Each remaining phecode gets a logistic regression, `phecode ~ HaT_Flag + covariates`; the `OR` column is HaT's odds ratio, adjusted. Read results by `q_fdr` (or `bonferroni`), not raw `p`: hundreds of phecodes are tested.
 
-``` r
-m1 <- matchit(
-  HaT_Flag ~ AgeAtIndex +
-    YearsBeforeIndex +
-    YearsAfterIndex +
-    log1p(ClinicVisitCountPreIndex) +
-    Race +
-    Ethnicity,
-  data = cohort,
-  method = "nearest",
-  distance = "glm",
-  exact = ~ Sex + IndexQuarter,
-  ratio = 4,
-  replace = FALSE,
-  caliper = 0.2,
-  std.caliper = TRUE
-)
-
-summary(m1)
-love.plot(m1, threshold = 0.1)
-matched <- match.data(m1)
-write_parquet(matched, "tutorial/synthetic_parquets/matchit_4to1_matched.parquet")
-```
-
-How to read that:
-
-- `HaT_Flag ~ ...` tells MatchIt which variables predict being a HaT case. These are the variables you want balanced.
-- `method = "nearest"` means each case is matched to nearest controls.
-- `distance = "glm"` estimates a logistic-regression propensity score.
-- `exact = ~ Sex + IndexQuarter` means controls must have the same sex and same 3-month calendar period.
-- `ratio = 4` asks for four controls per case.
-- `replace = FALSE` prevents the same control from being reused.
-- `caliper = 0.2, std.caliper = TRUE` prevents very distant propensity matches.
-- `summary(m1)` and `love.plot()` tell you whether matching worked.
-
-If exact quarter is too strict, relax `IndexQuarter` to `IndexYear` or remove exact calendar matching and add a caliper on index time. If too few controls match, try `ratio = 2`, allow replacement, or increase the candidate pool.
-
-MatchIt also supports Mahalanobis matching and Mahalanobis matching within propensity-score calipers. The official docs note that `exact` performs matching within exact strata, and that `mahvars` can specify which variables use Mahalanobis distance when the distance is a propensity score. See:
-
-- <https://search.r-project.org/CRAN/refmans/MatchIt/html/matchit.html>
-- <https://search.r-project.org/CRAN/refmans/MatchIt/html/method_nearest.html>
-- <https://stat.ethz.ch/CRAN/web/packages/MatchIt/vignettes/matching-methods.html>
-
-## YAML Recipe
-
-The file `hat-control-recipe.yaml` is meant to be filled in with your real parquet paths and column names. It uses aliases so you can write `p.PatientSex` instead of a long path. The convention is:
-
-``` text
-alias.ColumnName
-```
-
-For example, if your patient parquet is aliased as `p`, and sex is stored in `PatientSex`, use `p.PatientSex`.
-
-The wrapper should:
-
-1.  Load the listed parquet aliases.
-2.  Resolve every `alias.column` reference.
-3.  Build a match-ready cohort.
-4.  Apply eligibility filters.
-5.  Run MatchIt in R.
-6.  Write a matched patient parquet and a matched-pairs parquet.
-7.  Apply the `phewas_prep` block (drop exposure codes, pick the window) and export CSVs for `pheauxWAS`.
-
-That wrapper does not exist yet. For now, run `matchit_example.R` and `prepare_phewas_inputs.py` by hand.
-
-Start with the synthetic paths in the YAML, then replace them with your VM parquet paths.
+Two caveats belong in any write-up. The matched sets are not used in the regression: it is ordinary adjusted logistic regression on a matched cohort, not conditional logistic regression. And controls are "no known HaT", not proven non-HaT.

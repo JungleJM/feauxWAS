@@ -11,24 +11,22 @@ When an item here is built, delete it from this file and describe the result in 
 | Part | State |
 |------------------------------------|------------------------------------|
 | pheauxWAS 1.1.0 and pyPheWAS 2a8fff1 | Built; pheauxWAS `--selftest` passes (2026-10-01). The comparison against pyPheWAS on real-shaped data was not rerun |
-| Tutorial: synthetic data, MatchIt, `prepare_phewas_inputs.py` (with `--lookback-years`), pheauxWAS pre and post | Built and run end to end on the Mac (2026-10-01): 167 of 200 synthetic cases matched |
+| Tutorial, remade on Cosmos-shaped synthetic pulls: generator, builder, MatchIt 10:1, `prepare_phewas_inputs.py`, pheauxWAS pre and post | Built and run end to end on the Mac (2026-10-03): 328 of 350 eligible synthetic cases matched, to 2,471 controls |
 | Study design (D4–D13, D24–D26) | Decided; the case rule (D24) and index (D4) are provisional, pending the user's attending (`Attending Questions.md`) |
-| `hat_` pull (`HaT_PheWAS_intake.yaml`) | Written; passes Telescope's validator against its dictionary. Not yet run |
-| Profile queries (`profile_queries.sql`) | 1–6 run (2026-10-01); being rerun with 7–11 for whole results |
-| One-row-per-patient builder (Python) | Not started |
-| `ctrl_` pull | Not designed |
+| `hat_` pull | Run on the VM, 2026-10-02 (D28): `hat_Patients`, `hat_Encounters`, `hat_Diagnoses`, `hat_Labs`, as parquets there |
+| Profile queries (`tutorial/pulling-cohorts/profile_queries.sql`) | All run (2026-10-03); 7 folded into 2 |
+| `build_group_parquet.py` | Built; run on the synthetic pulls under the VM's pandas 2.2.3, pyarrow 22 and numpy 2.1.3. Not yet run on the real `hat_` pull |
+| `ctrl_` pull (`ctrl_PheWAS_intake.yaml`) | Written; passes Telescope's validator (one expected warning) and its dry run renders the intended sampling SQL. Not yet run |
 
 ------------------------------------------------------------------------
 
 ## Next, In Order
 
-1.  **Profile query results 7–11** (task list): the true first D89.44 before 2018, the gap from other D89.4x codes, every race and ethnicity value, every face-to-face encounter type, and the case count by number of D89.44 dates.
-2.  **Run the `hat_` pull.** Copy `reference/HaT_PheWAS_intake.yaml` to Telescope's `YAMLs/temp/`, confirm `project_db`, and pull.
-3.  **The one-row-per-patient builder**: Python that turns `hat_Patients`, `hat_Encounters` and `hat_Diagnoses` into the matching table (design.md, Derived Fields), with the case rule and the eligibility filter. Built and tested on synthetic data shaped like the pull first.
-4.  **The `ctrl_` pull**: sampling per quarter (D6) and the patient-level fields for the \~50× pool (D16). How to sample at random per quarter in a Telescope pull is not worked out.
-5.  **Match** with MatchIt on the real cohort; check balance and unmatched cases.
-6.  **Pull `ctrl_` diagnoses** for the matched controls only (D16).
-7.  **Run the PheWAS**: pre with a 3-year lookback, then post (D12).
+1.  **Build the hat group on the VM**: `build_group_parquet.py` beside the `hat_` parquets; read `hat_group_report.txt` (task list).
+2.  **Run the `ctrl_` pull**, with `hat_patient_keys.parquet` beside its intake. If the pool comes back under 300,000, raise `pool_permille`.
+3.  **Build the control group** the same way.
+4.  **Match** with MatchIt on the real groups; check balance, unmatched cases, and how many cases got fewer than 10 controls.
+5.  **Run the PheWAS**: pre with a 3-year lookback, then post (D12).
 
 ------------------------------------------------------------------------
 

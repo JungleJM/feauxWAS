@@ -10,75 +10,48 @@ Work on the task list section "<heading>" in reference/plan/tasklist.md.
 
 A new chat reads `.claude/CLAUDE.md` by itself, which sends it to the plan documents and tells it to answer here. The one rule that keeps it true: **anything that matters and was only said in a chat goes into this file before that chat ends**, under the section it belongs to.
 
-## Profile query results 7–11
+## Next on the VM
 
-You're rerunning 1–10 for whole results (and 11, the case count by number of D89.44 dates). What 1–6 settled is now in D23–D26 and `Attending Questions.md`.
-
-::: {style="border:2px solid #4a90e2; border-radius:6px; padding:8px 12px; margin:8px 0;"}
-**Claude: what's still waiting on them**
-
-Paste each result as text (in SSMS: Ctrl+A on the grid, right-click → **Copy with Headers**).
-
-- **7**: patients whose first D89.44 is before 2018. With the pull now from 1990 (D23), this mainly tells us how far back the cohort goes.
-- **8**: how long before the first D89.44 the other D89.4x codes came. Goes into `Attending Questions.md`, question 1.
-- **9**: every race and ethnicity value, to check the Unknown grouping (D10).
-- **10**: every encounter type flagged face-to-face, in case one besides Office Visit belongs (D26).
-- **11**: the single-date patients: recent, or only on a problem list. Goes into `Attending Questions.md`, question 2.
-:::
-
-::: {style="border:2px solid #e2904a; border-radius:6px; padding:8px 12px; margin:8px 0;"}
-**Your response**
-
-7.
-
-8.
-
-9.
-
-10.
-
-11.
-:::
-
-## Other files that restate the plan docs
-
-Your rule (D27): anything already in design, decisions or roadmap gets deleted elsewhere, so nothing can drift. `cosmos_parquet_ref.yaml` and `Questions.md` are deleted. Other files still restate the study.
+What you asked for is built in `tutorial/adapting-cosmos/`: the script, its walkthrough (`README.md`), and the control pull (`ctrl_PheWAS_intake.yaml`). The tutorial is remade on the same files and columns. Your answers are in D29–D32.
 
 ::: {style="border:2px solid #4a90e2; border-radius:6px; padding:8px 12px; margin:8px 0;"}
-**Claude: what else restates it**
+**Claude: what to run, and what to send back**
 
-- **`tutorial/`**: `control-matching-tutorial.md`, `why-and-how-for-phewas.md` and `hat-control-recipe.yaml` describe the matching, windows and case rule, partly as the real study's choices. They've already drifted: the tutorial's case rule is still 2 dates (D24 made it 1).
-- **`HaT_PheWAS_intake.yaml`**: its header comment explains the three tables, which `design.md` (The Cosmos Pull) also does.
-- **`profile_queries.sql`**: its "Look for" comments are fine, since they're instructions, not facts.
+1. Copy `build_group_parquet.py` into the `hat_` pull's parquet folder and run `python build_group_parquet.py`. **Paste `hat_group_report.txt` here**: it lists every `DiagnosisStatus` and which were dropped (the script drops any containing "rule", "error", "delete" or "cancel"; the real spellings are unknown until now), the sex, race, ethnicity and encounter-status values, and who isn't eligible.
+2. Put the `hat_patient_keys.parquet` it writes beside `ctrl_PheWAS_intake.yaml`, check `project_db`, and run the pull. **Send back** how many rows `ctrl_Patients` got: under 300,000 means raising `pool_permille`.
+3. Run the script in the `ctrl_` parquet folder too, and paste `control_group_report.txt`.
 
-**Recommend:** keep the tutorial as teaching material on synthetic data, but strip it of the real study's decisions: it explains the *method*, and points to `design.md` for what the HaT study actually does. Cut the intake's header comment to one line pointing to `design.md`, since Telescope only needs the YAML itself.
-
-**For you to decide:** that, or delete the tutorial's HaT-specific files outright.
+Then matching and the PheWAS, as in `control-matching-tutorial.md`.
 :::
 
 ::: {style="border:2px solid #e2904a; border-radius:6px; padding:8px 12px; margin:8px 0;"}
 **Your response**
 :::
 
-## Precision
-
-(Your note, 2026-10-01: "once done we'll talk through more of precision".)
+## Three choices made while building
 
 ::: {style="border:2px solid #4a90e2; border-radius:6px; padding:8px 12px; margin:8px 0;"}
-**Claude: what to cover**
+**Claude: in the code now, for you to confirm**
 
-Not started. Say what you want to cover and I'll answer here: for example how many cases each phecode needs (pheauxWAS's `--min-cases 20`), the power at 4:1 with 5,967 cases, or how tight the matching needs to be.
+1. **Cases indexed before 2021-10-01 aren't matched.** 134 of the 5,974 have their first D89.44 before the code existed (query 2): 15 before 2015, 119 from 2015 to 2021 Q3. The control pool starts at 2021-10-01 (D30), so exact-quarter matching has no controls for them, and their D89.44 was likely mapped after the fact. The script marks them (`IndexBeforeD8944Existed`) and makes them ineligible. **Recommend:** keep it so, and report them; widening the pool back to 2015 would roughly double the pool for 2% of cases.
+2. **Earlier mast-cell codes will show up as a PheWAS result.** Only D89.44 is dropped from the events, so the 1,523 cases with an earlier D89.40–D89.49 put phecode `BI_180.6` (Mast cell activation syndrome) into the pre-index window: partly the HaT workup itself (Attending Questions, question 1). **Recommend:** primary analysis drops D89.44 only, and reads `BI_180.6` as exposure-adjacent; a sensitivity analysis drops all of D89.40–D89.49 (`--exclude-codes D89.40 D89.41 D89.42 D89.43 D89.44 D89.49`).
+3. **Controls with a high tryptase are kept.** A control with a baseline tryptase above about 8 ng/mL may be undiagnosed HaT. The script records `TryptaseMax` for controls but doesn't drop anyone. **Recommend:** drop controls with `TryptaseMax` above 8 before matching; there should be very few, and it reduces misclassification of controls.
+
+**For you to decide:** each of 1–3.
 :::
 
 ::: {style="border:2px solid #e2904a; border-radius:6px; padding:8px 12px; margin:8px 0;"}
 **Your response**
+
+1.
+2.
+3.
 :::
 
 ## Suggested order
 
-1.  **Profile query results 7–11**: they fill in the attending questions and confirm the race and visit definitions before the Python builder is written.
-2.  **Other files that restate the plan docs**: quick, and the tutorial has already drifted.
-3.  **Precision**: whenever you're ready; it doesn't block the pull.
+1.  **Next on the VM**: the reports show whether the script's guesses (status spellings, units) fit the real data.
+2.  **Three choices**: needed before matching, not before the pull.
 
 # Settled
 

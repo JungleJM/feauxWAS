@@ -1,0 +1,21 @@
+hat group, built from tutorial/synthetic_cosmos/hat
+read: 400 patients, 25,466 encounters, 11,579 diagnosis rows, 431 lab rows
+
+DiagnosisStatus values (dropped ones marked x):
+    Active: 10,016
+    Resolved: 992
+  x Ruled Out: 571
+diagnoses kept: 9,940 patient-code-date rows
+index: 0 cases moved to a later D89.44 by the status filter; 0 had no D89.44 left and are dropped
+
+sex: {'Female': 303, 'Male': 97}
+race: {'White': 299, 'Black or African American': 37, 'Unknown': 36, 'Asian': 16, 'Other Race': 12}
+ethnicity: {'Not Hispanic or Latino': 348, 'Hispanic or Latino': 26, 'Unknown': 26}
+
+encounter statuses: {'Complete': 23535, 'Canceled': 1168, 'No Show': 763}
+
+wrote hat_group.parquet: 400 patients, 350 eligible for matching
+  not eligible: 45 with under 2 clinic visits in the year before index; 0 with no usable sex; 7 indexed before 2021-10-01
+wrote hat_group_diagnoses.parquet: 9,940 rows
+  243 with D89.44 on 2+ dates; 122 with an earlier D89.4x; 199 with a baseline tryptase
+wrote hat_patient_keys.parquet: upload it to the ctrl_ pull

@@ -28,10 +28,11 @@ SELECT COUNT(*)                                       AS n_any,
 FROM hat_dates;
 
 
-/* 2. Cases per calendar quarter (the control sampling targets).
+/* 2. Cases per calendar quarter, all years (the control sampling targets).
    Quarter from a DateKey: year = key / 10000, month = (key / 100) % 100.
-   Look for: quarters with very few cases (exact-quarter matching may fail there),
-   and whether earliest_first_date in query 1 is around 2021-10 or later. */
+   n_any: patients with any D89.44 whose first is in that quarter; n_2plus: those
+   with it on 2+ dates.
+   Look for: how far back first dates go, and the busiest quarter (it sizes the pool). */
 WITH hat_dates AS (
     SELECT def.PatientDurableKey,
            COUNT(DISTINCT def.StartDateKey) AS n_dates,
@@ -39,15 +40,15 @@ WITH hat_dates AS (
     FROM DiagnosisEventFact AS def
     INNER JOIN DiagnosisTerminologyDim AS dt ON dt.DiagnosisKey = def.DiagnosisKey
     WHERE def._IsDeleted = 0 AND dt._IsDeleted = 0
-      AND def.StartDateKey BETWEEN 20180101 AND 20260601
+      AND def.StartDateKey BETWEEN 19900101 AND 20260601
       AND dt.Type = 'ICD-10-CM' AND dt.Value = 'D89.44'
     GROUP BY def.PatientDurableKey
 )
 SELECT first_date / 10000                              AS index_year,
        ((first_date / 100) % 100 - 1) / 3 + 1          AS index_quarter,
-       COUNT(*)                                        AS n_cases
+       COUNT(*)                                        AS n_any,
+       SUM(CASE WHEN n_dates >= 2 THEN 1 ELSE 0 END)   AS n_2plus
 FROM hat_dates
-WHERE n_dates >= 2
 GROUP BY first_date / 10000, ((first_date / 100) % 100 - 1) / 3 + 1
 ORDER BY index_year, index_quarter;
 
@@ -138,29 +139,6 @@ ORDER BY n DESC;
 
 
 /* ---- Follow-ups to the first results (2026-10-01) ---- */
-
-/* 7. First D89.44 with no 2018 floor.
-   Query 1 only searched from 2018, so a "first" D89.44 in 2018 may not be the first.
-   Look for: how many patients' true first D89.44 is before 2018 (first_year < 2018),
-   and the case count per year of first D89.44. One row per year, so it fits on screen. */
-WITH hat_dates AS (
-    SELECT def.PatientDurableKey,
-           COUNT(DISTINCT def.StartDateKey) AS n_dates,
-           MIN(def.StartDateKey)            AS first_date
-    FROM DiagnosisEventFact AS def
-    INNER JOIN DiagnosisTerminologyDim AS dt ON dt.DiagnosisKey = def.DiagnosisKey
-    WHERE def._IsDeleted = 0 AND dt._IsDeleted = 0
-      AND def.StartDateKey BETWEEN 19900101 AND 20260601
-      AND dt.Type = 'ICD-10-CM' AND dt.Value = 'D89.44'
-    GROUP BY def.PatientDurableKey
-)
-SELECT first_date / 10000                              AS first_year,
-       COUNT(*)                                        AS n_any,
-       SUM(CASE WHEN n_dates >= 2 THEN 1 ELSE 0 END)   AS n_2plus
-FROM hat_dates
-GROUP BY first_date / 10000
-ORDER BY first_year;
-
 
 /* 8. How long before the first D89.44 the first other D89.4x code came.
    Query 3 showed 1,433 patients with D89.40 before their first D89.44.

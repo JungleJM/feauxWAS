@@ -13,7 +13,7 @@ Read before working:
 - A fact lives in one of those three documents only. Status lives only in the roadmap.
 - When code or the study design changes, update `design.md` in the same commit. When an item is built, delete it from the roadmap. When something is decided, add a numbered decision.
 - Nothing outside the three documents restates them: once a note's content is in them, the note is deleted, and other files point to them (D27).
-- `reference/plan/Attending Questions.md` holds questions for the user's attending: what the data showed, what the study does for now, and the question. Add to it when the user asks; it asks, it doesn't decide.
+- `reference/plan/Future discussions/Attending Questions.md` holds questions for the user's attending: what the data showed, what the study does for now, and the question. Add to it when the user asks; it asks, it doesn't decide.
 - Do not add new design documents. `reference/plan/tasklist.md` is not one: it holds only what is still under discussion (D1).
 - **"Update docs"** means: bring `design.md`, `decisions.md` and `roadmap.md` up to date with the code and the task list by the rules above, move every settled task-list item into them and delete it from the task list, and delete any pasted image in `reference/plan/images/` that no document mentions.
 
@@ -46,8 +46,8 @@ The user works in this cycle; follow it for any change bigger than a small fix.
 - `pheauxWAS/pheauxWAS.py`: the PheWAS tool, Python and numpy only. `--selftest` runs its checks; `--help` documents every flag.
 - `pyPheWAS-2a8fff1/`: the published pyPheWAS at commit 2a8fff1, for cross-checking. Not ours to edit.
 - `phecode/`: the phecodeX ICD-CM map and phecode definitions (Latin-1 encoded).
-- `tutorial/`: the method on synthetic data, end to end (design.md, The Tutorial).
-- `reference/`: the Cosmos data dictionary (a copy; Telescope's is the source of truth, D2), the HaT pull (`HaT_PheWAS_intake.yaml`), and `plan/`.
+- `tutorial/`: the method on synthetic data, end to end (design.md, The Tutorial); `tutorial/pulling-cohorts/` holds the HaT intake and the profile queries.
+- `reference/`: the Cosmos data dictionary (a copy; Telescope's is the source of truth, D2), the pull as run on the VM (`hat_cosmos_blueprint.yaml`), and `plan/`.
 - `bundling/make_bundle.py`: packs the repo into one file for the VM.
 
 ## Constraints
