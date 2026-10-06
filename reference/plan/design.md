@@ -36,7 +36,7 @@ Eligibility for both: at least 2 clinic-visit days in the 365 days before index 
 
 ### The Group Files
 
-`tutorial/adapting-cosmos/build_group_parquet.py` turns each pull into `<group>_group.parquet`, one row per patient, and `<group>_group_diagnoses.parquet`, one row per patient, ICD-10-CM code and date (D29). Its README lists every column and each step. The study's choices it applies:
+`tutorial/adapting-cosmos/build_group_parquet.py` turns each pull into `<group>_group.parquet`, one row per patient, and `<group>_group_diagnoses.parquet`, one row per patient, ICD-10-CM code and date (D29). Its README lists every column and each step; `--selftest` checks its DateKey parsing, including that the memory it needs doesn't grow with a string per row (the control pull's diagnoses ran out of memory that way). The study's choices it applies:
 
 - diagnoses with a ruled-out or error `DiagnosisStatus` are dropped, then collapsed to one row per patient, code and date;
 - a case's index is their first D89.44 surviving that filter (D4, D24); a control's is the sampled clinic visit (D30), and a control with any D89.44 is dropped;

@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 
@@ -46,10 +47,18 @@ LAB_COLS = ["PatientDurableKey", "LabComponentKey", "PrioritizedDateKey", "Numer
 
 
 def datekey(s: pd.Series) -> pd.Series:
-    """Cosmos DateKeys (20230517) to dates; negative or odd keys become NaT."""
-    s = pd.to_numeric(s, errors="coerce")
-    s = s.where(s > 19000000)
-    return pd.to_datetime(s.astype("Int64").astype(str), format="%Y%m%d", errors="coerce")
+    """Cosmos DateKeys (20230517) to dates; negative or odd keys become NaT.
+
+    Parses each distinct key once and maps it back: a string per row runs out of
+    memory on the control pull's diagnoses.
+    """
+    s = pd.to_numeric(s, errors="coerce").astype("float64")
+    s = s.where((s > 19000000) & (s % 1 == 0))
+    codes, keys = pd.factorize(s)                    # missing keys get code -1
+    dates = pd.to_datetime(pd.Series(keys, dtype="int64").astype(str),
+                           format="%Y%m%d", errors="coerce").to_numpy()
+    dates = np.append(dates, np.array(["NaT"], dtype=dates.dtype))  # code -1 picks this NaT
+    return pd.Series(dates[codes], index=s.index)
 
 
 def unknown_if_blank(s: pd.Series) -> pd.Series:
@@ -79,9 +88,32 @@ def count_days(events: pd.DataFrame, index: pd.Series, lo: int, hi: int) -> pd.S
     return hit.groupby("PatientDurableKey")["Date"].nunique()
 
 
+def selftest() -> None:
+    """Checks of what ends up in the output; run with --selftest."""
+    import tracemalloc
+    s = pd.Series([20230517, -1, 20231399, None, 20230517, 20240229], index=[5, 3, 9, 1, 2, 7])
+    got = datekey(s)
+    want = pd.to_datetime(["2023-05-17", None, None, None, "2023-05-17", "2024-02-29"])
+    assert got.index.equals(s.index) and got.tolist() == want.tolist(), got
+    assert datekey(pd.Series(["20230517", "x"])).tolist()[0] == pd.Timestamp("2023-05-17")
+    assert datekey(pd.Series([], dtype="int64")).empty
+    # The control pull's diagnoses ran out of memory with a string per row (~110-160
+    # bytes a row); parsing each distinct key once takes ~33.
+    n = 1_000_000
+    many = pd.Series(20150101 + np.arange(n) % 28)
+    tracemalloc.start()
+    got = datekey(many)
+    peak = tracemalloc.get_traced_memory()[1]
+    tracemalloc.stop()
+    assert peak / n < 64, f"datekey used {peak / n:.0f} bytes a row"
+    assert got.iloc[27] == pd.Timestamp("2015-01-28") and got.notna().all()
+    print("selftest passed")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--selftest", action="store_true", help="run the checks and exit")
     ap.add_argument("--dir", type=Path, default=Path(__file__).resolve().parent,
                     help="folder with the pull's parquets (default: this script's folder)")
     ap.add_argument("--prefix", choices=["hat", "ctrl"],
@@ -89,6 +121,9 @@ def main() -> None:
     ap.add_argument("--data-end", default="2026-06-01",
                     help="last date in the pull (max_date_key); ends observation")
     args = ap.parse_args()
+    if args.selftest:
+        selftest()
+        return
     folder = args.dir
 
     prefix = args.prefix

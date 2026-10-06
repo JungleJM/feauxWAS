@@ -15,7 +15,7 @@ From the two Telescope pulls to `hat_group.parquet` and `control_group.parquet`,
 4.  **Build the control group.** Same as step 1, in the `ctrl_` pull's parquet folder: `control_group.parquet`, `control_group_diagnoses.parquet`, `control_group_report.txt`. If the report says some controls had a D89.44, they were dropped.
 5.  **Match and run the PheWAS**, as in `../control-matching-tutorial.md` (steps 3–5), pointing at the real group files.
 
-To run the script on parquets in another folder: `python build_group_parquet.py --dir <folder>`.
+To run the script on parquets in another folder: `python build_group_parquet.py --dir <folder>`. To check the script itself: `python build_group_parquet.py --selftest`.
 
 ## What The Script Does
 
