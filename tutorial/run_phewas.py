@@ -6,7 +6,8 @@ On the VM, from the pheauxWAS folder, everything is one short command (D36, D37)
     python phewas check     is everything here? Python packages, R and its packages, the files
     python phewas match     MatchIt -> runs\matching\
     python phewas balance   what to judge in the match: SMDs over 0.1, unmatched cases, controls per case
-    python phewas sheet     one page: where the study stands and the next step (match, pre, post print it too)
+    python phewas sheet     one page: where the study stands and the next step (match prints it too)
+    python phewas results   one page on one PheWAS run, e.g. python phewas results pre (pre and post print it too)
     python phewas pre       the PheWAS, 3 years before index -> runs\pre_3y\
     python phewas post      the PheWAS, after index -> runs\post\
     python phewas update    unpack the newest *bundle*.py in this folder over these scripts
@@ -44,6 +45,13 @@ from pathlib import Path
 HERE = Path(os.path.abspath(__file__)).parent
 R_PACKAGES = ["MatchIt", "arrow", "cobalt", "dplyr"]
 COVARIATES = ["AgeAtIndex", "Sex", "Race", "Ethnicity", "YearsBeforeIndex", "ClinicVisits365Before"]
+
+
+def covariates_for(window: str) -> list[str]:
+    """The regression covariates for a window. Windows that count diagnoses after index
+    also adjust for follow-up after index (D40): it was the one variable just over
+    SMD 0.1 after matching, and more follow-up means more chances to be coded."""
+    return COVARIATES + (["YearsAfterIndex"] if window in ("post", "all") else [])
 PYPHEWAS = "pyPheWAS-2a8fff1"
 PYPHEWAS_MIN_CASES = 5           # pyPhewasPipeline's --reg_thresh default
 
@@ -147,13 +155,13 @@ def match(args) -> None:
         sheet(args)
 
 
-def pyphewas_inputs(inputs: Path, events_name: str, folder: Path) -> None:
+def pyphewas_inputs(inputs: Path, events_name: str, folder: Path, covars: list[str]) -> None:
     """pyPheWAS's group.csv and icds.csv, from the same people and events."""
     import pandas as pd
     people = pd.read_csv(inputs / "people_matched.csv", parse_dates=["BirthDate", "ObservationEndDate"],
-                         usecols=["PatientDurableKey", "HaT_Flag", *COVARIATES, "BirthDate", "ObservationEndDate"])
+                         usecols=["PatientDurableKey", "HaT_Flag", *covars, "BirthDate", "ObservationEndDate"])
     years = lambda later, birth: (later - birth).dt.days / 365.25
-    group = people[["PatientDurableKey", "HaT_Flag"] + COVARIATES].rename(columns={"PatientDurableKey": "id"})
+    group = people[["PatientDurableKey", "HaT_Flag"] + covars].rename(columns={"PatientDurableKey": "id"})
     group["MaxAgeAtVisit"] = years(people["ObservationEndDate"], people["BirthDate"])
     group.to_csv(folder / "group.csv", index=False)
 
@@ -209,8 +217,10 @@ def run(args) -> None:
                      "--out-dir", inputs], inputs / "console.txt"):
         die("preparing the inputs failed; nothing else was run.")
     people, events = inputs / "people_matched.csv", inputs / f"diagnosis_events_{args.window}.csv"
+    covars = covariates_for(args.window)
+    log.write(f"  covariates: {' + '.join(covars)}")
     common = ["--people", people, "--id-col", "PatientDurableKey", "--predictors", "HaT_Flag",
-              "--covars", *COVARIATES, "--events", events, "--events-id-col", "PatientDurableKey",
+              "--covars", *covars, "--events", events, "--events-id-col", "PatientDurableKey",
               "--code-col", "DiagnosisCode", "--vocab-col", "Vocabulary", "--date-col", "DiagnosisDate"]
 
     # 2. The study's PheWAS.
@@ -248,10 +258,10 @@ def run(args) -> None:
             failed.append("pyphewas (packages)")
         else:
             log.write("\n== pyPheWAS inputs: group.csv and icds.csv from the same people and events")
-            pyphewas_inputs(inputs, events.name, out)
+            pyphewas_inputs(inputs, events.name, out, covars)
             ok = log.step("pyPheWAS 2a8fff1: Phecode 1.2, its rules, L1-penalized",
                           [py, pyp / "bin" / "pyPhewasPipeline", "--phenotype", "icds.csv", "--group", "group.csv",
-                           "--reg_type", "log", "--covariates", "+".join(COVARIATES), "--target", "HaT_Flag",
+                           "--reg_type", "log", "--covariates", "+".join(covars), "--target", "HaT_Flag",
                            "--path", out, "--postfix", name], out / "console.txt", env=env)
             if not args.keep_feature_matrices:
                 # Two text copies of the patient-by-phecode matrix, gigabytes each.
@@ -280,7 +290,8 @@ def run(args) -> None:
               + f"\n  {run_dir}")
     print()
     if args.runs is None:
-        sheet(args)
+        print("\n".join(run_sheet(run_dir)))
+        print(f"\n(this run's sheet: {run_dir / 'sheet.txt'}; the whole study: python phewas sheet)")
     if failed:
         sys.exit(1)
 
@@ -376,7 +387,8 @@ def match_lines(f: dict, detail: bool) -> list[str]:
     lines = [f"MATCHING: {f['cases']:,} of {f['eligible']:,} eligible cases matched to {f['controls']:,} controls",
              f"  balance: largest SMD {big['variable']} {abs(big['SMD']):.3f} -> "
              + ("all under 0.1, OK" if over.empty else f"{len(over)} OVER 0.1: "
-                + ", ".join(f"{r['variable']} {r['SMD']:+.2f}" for _, r in over.iterrows()))]
+                + ", ".join(f"{r['variable']} {r['SMD']:+.3f}" for _, r in over.iterrows())
+                + ("  (YearsAfterIndex: adjusted for in post, D40)" if "YearsAfterIndex" in set(over["variable"]) else ""))]
     by_q = gone["IndexQuarter"].astype(str).value_counts().head(3) if len(gone) else None
     lines.append(f"  unmatched cases: {len(gone):,} ({len(gone) / max(f['eligible'], 1):.1%})"
                  + (", most in " + ", ".join(f"{q} ({n})" for q, n in by_q.items()) if by_q is not None else ""))
@@ -435,7 +447,7 @@ def run_lines(run_dir: Path) -> list[str]:
                      f"{int((tested['q_fdr'] < 0.05).sum()):,} FDR<0.05; {int((tested['model'] == 'firth').sum()):,} by Firth")
         for _, x in tested.sort_values("p").head(8).iterrows():
             lines.append(f"    {x['phecode']:<10} {str(x['description'])[:38]:<38} OR {x['OR']:>7.3g} "
-                         f"[{x['OR_lower95']:.3g}-{x['OR_upper95']:.3g}]  q {x['q_fdr']:.2g}  cases {int(x['n_cases']):,}"
+                         f"[{x['OR_lower95']:.3g}-{x['OR_upper95']:.3g}]  q {fmt_p(x['q_fdr'])}  cases {int(x['n_cases']):,}"
                          + ("  (Firth)" if x["model"] == "firth" else ""))
     else:
         lines.append("  pheauxWAS: no results")
@@ -449,6 +461,111 @@ def run_lines(run_dir: Path) -> list[str]:
     else:
         lines.append("  pyPheWAS: skipped")
     return lines
+
+
+def fmt_p(v) -> str:
+    """A p or q value; 0 means it underflowed below about 1e-300, not that it is zero."""
+    return "<1e-300" if v == 0 else f"{v:.2g}"
+
+
+ADJACENT_WORDS = ("mast", "immune mechanism", "serum enzyme", "myeloid", "tryptase", "anaphyla")
+
+
+def run_sheet(run_dir: Path) -> list[str]:
+    """One page on one run, from its files: inputs, the study's results, the cross-check.
+    Also written to <run>/sheet.txt."""
+    import numpy as np
+    import pandas as pd
+    name = run_dir.name
+    window = "3 years before index" if name.startswith("pre") else ("after index" if name.startswith("post") else name)
+    log_text = (run_dir / "run_log.txt").read_text(errors="replace") if (run_dir / "run_log.txt").exists() else ""
+    covars = next((l.split(":", 1)[1].strip() for l in log_text.splitlines() if l.strip().startswith("covariates:")),
+                  None) or " + ".join(covariates_for("post" if name.startswith("post") else "pre"))   # runs before covariates were logged
+    L = [f"RESULTS {name}: {window}" + ("" if finished(run_dir) else "  (UNFINISHED: see run_log.txt)"),
+         f"  model: phecode ~ HaT_Flag + {covars}"]
+
+    people = run_dir / "inputs" / "people_matched.csv"
+    console = run_dir / "inputs" / "console.txt"
+    if people.exists():
+        hat = pd.read_csv(people, usecols=["HaT_Flag"])["HaT_Flag"]
+        text = console.read_text(errors="replace") if console.exists() else ""
+        kept = next((l.split()[0] for l in text.splitlines() if "rows kept in window" in l), "?")
+        dropped = next((l.split()[0] for l in text.splitlines() if "dropped as exposure codes" in l), "?")
+        L.append(f"INPUTS: {len(hat):,} people ({int(hat.sum()):,} HaT, {int((hat == 0).sum()):,} controls); "
+                 f"{int(kept):,} diagnoses in window; {int(dropped):,} D89.44 rows removed" if kept.isdigit()
+                 and dropped.isdigit() else f"INPUTS: {len(hat):,} people")
+
+    res = run_dir / "pheauxwas" / f"hat_phewas_{name}_results.csv"
+    if not res.exists():
+        return L + ["PHEAUXWAS: no results file"]
+    r = pd.read_csv(res)
+    t = r[r["p"].notna()].copy()
+    fdr = t[t["q_fdr"] < 0.05]
+    bon = t[t["bonferroni"].astype(str).str.upper() == "TRUE"]
+    risk = lambda d: f"{int((d['OR'] > 1).sum()):,} higher in HaT / {int((d['OR'] < 1).sum()):,} lower"
+    L += ["PHEAUXWAS (phecodeX, the study's result)",
+          f"  {len(t):,} phecodes tested; {len(r) - len(t):,} not tested (under 20 cases, or no fit)",
+          f"  Bonferroni {len(bon):,} ({risk(bon)}); FDR<0.05 {len(fdr):,} ({risk(fdr)})",
+          f"  Firth (separation found) {int((t['model'] == 'firth').sum()):,}, of which FDR<0.05 "
+          f"{int((fdr['model'] == 'firth').sum()):,}"]
+    cats = fdr["category"].fillna("?").value_counts().head(8)
+    L.append("  FDR hits by category: " + ", ".join(f"{c} {n}" for c, n in cats.items()))
+
+    def row(x) -> str:
+        return (f"    {x['phecode']:<10} {str(x['description'])[:34]:<34} OR {x['OR']:>6.3g} "
+                f"[{x['OR_lower95']:.3g}-{x['OR_upper95']:.3g}] q {fmt_p(x['q_fdr']):>7} "
+                f"cases {int(x['n_cases']):>6,}" + (" F" if x["model"] == "firth" else ""))
+    L.append("  TOP 20 by p (F = Firth):")
+    L += [row(x) for _, x in t.sort_values(["p", "q_fdr"]).head(20).iterrows()]
+    low = fdr[fdr["OR"] < 1].sort_values("p").head(5)
+    if len(low):
+        L.append("  TOP 5 LOWER in HaT (FDR<0.05):")
+        L += [row(x) for _, x in low.iterrows()]
+    adj = t[t["description"].astype(str).str.lower().str.contains("|".join(ADJACENT_WORDS))]
+    if len(adj):
+        L.append("  POSSIBLY PART OF THE HaT WORKUP (by name; read as exposure-adjacent): "
+                 + ", ".join(f"{x['phecode']} OR {x['OR']:.3g}" for _, x in adj.sort_values("p").head(8).iterrows()))
+
+    comp = next(iter((run_dir / "comparison").glob("*_compare.csv")), None) if (run_dir / "comparison").exists() else None
+    if comp is None:
+        L.append("CROSS-CHECK: " + ("pyPheWAS skipped" if not (run_dir / "pyphewas").exists() else "no comparison; see run_log.txt"))
+    else:
+        c = pd.read_csv(comp)
+        a, b = c["pheauxWAS beta"], c["pyPheWAS beta"]
+        both = c[a.notna() & b.notna()]
+        a, b = both["pheauxWAS beta"], both["pyPheWAS beta"]
+        diff = (b - a).abs()
+        sep = (a.abs() > 10) | (b.abs() > 10)
+        ok = both[~sep]
+        r_all = np.corrcoef(a, b)[0, 1] if len(both) > 2 else float("nan")
+        r_ok = np.corrcoef(ok["pheauxWAS beta"], ok["pyPheWAS beta"])[0, 1] if len(ok) > 2 else float("nan")
+        L += ["CROSS-CHECK: pyPheWAS vs pheauxWAS on Phecode 1.2 with pyPheWAS's rules (should agree)",
+              f"  {len(both):,} phecodes in both; same direction {int((np.sign(a) == np.sign(b)).sum()):,}; "
+              f"median |beta diff| {diff.median():.4f}; correlation {r_all:.3f}",
+              f"  {int(sep.sum()):,} separated (|beta| > 10 in either: unpenalized ML vs pyPheWAS's L1 penalty differ "
+              f"by design); without them: correlation {r_ok:.3f}, max |diff| {(diff[~sep].max() if (~sep).any() else 0):.3f}"]
+        worst = both[~sep].assign(d=diff[~sep]).sort_values("d", ascending=False).head(3)
+        if len(worst):
+            L.append("  largest differences (not separated): " + "; ".join(
+                f"{x['phecode']} {x['pheauxWAS beta']:.2f} vs {x['pyPheWAS beta']:.2f}" for _, x in worst.iterrows()))
+    L.append("Read by q (FDR), not p. OR > 1: more common in HaT than in matched controls.")
+    (run_dir / "sheet.txt").write_text("\n".join(L) + "\n", encoding="utf-8")
+    return L
+
+
+def results(args) -> None:
+    """The one-sheet of one run (pre, post or a run folder's name; default: the latest)."""
+    runs = args.root / "runs"
+    dirs = [d for d in runs.glob("*") if (d / "inputs").is_dir() and "_unfinished_" not in d.name] if runs.exists() else []
+    if not dirs:
+        die("no PheWAS run yet; run python phewas pre first.")
+    if args.name:
+        want = {"pre": "pre_3y"}.get(args.name, args.name)
+        dirs = [d for d in dirs if d.name == want]
+        if not dirs:
+            die(f"no run folder runs/{want}.")
+    d = max(dirs, key=lambda d: d.stat().st_mtime)
+    print("\n".join(run_sheet(d)))
 
 
 def sheet(args) -> None:
@@ -472,7 +589,8 @@ def sheet(args) -> None:
         nxt = "build the missing group files (build_group_parquet.py), then python phewas match"
     elif not matched:
         nxt = "python phewas match"
-    elif not f["over"].empty or len(f["gone"]) > 0.1 * f["eligible"]:
+    elif (not f["over"][f["over"]["variable"] != "YearsAfterIndex"].empty
+          or len(f["gone"]) > 0.1 * f["eligible"]):
         nxt = "send this sheet: balance or unmatched cases need a decision before the PheWAS"
     elif "pre_3y" not in names:
         nxt = "python phewas pre"
@@ -558,6 +676,8 @@ def main() -> None:
         "--rscript", help="the Rscript program, if not found by itself")
     sub.add_parser("update", help="unpack the newest *bundle*.py here")
     sub.add_parser("sheet", help="one page: where the study stands and the next step")
+    sub.add_parser("results", help="one page on one PheWAS run (pre, post or its folder name; default the latest)"
+                   ).add_argument("name", nargs="?")
     sub.add_parser("balance", help="after match: SMDs over 0.1, unmatched cases, controls per case").add_argument(
         "--cohort", type=Path, help="default: runs/matching/matched_cohort.parquet")
     sub.add_parser("vscode", help="point VSCodium's terminal and R extension at the newest R").add_argument(
@@ -585,7 +705,7 @@ def main() -> None:
     r = sub.add_parser("run", parents=[common], help="any one window, every tool")
     r.add_argument("--window", choices=["pre", "post", "all"], required=True)
     r.add_argument("--lookback-years", type=float, help="with --window pre: the years before index (study: 3)")
-    commands = {"check", "update", "vscode", "match", "balance", "sheet", "pre", "post", "run"}
+    commands = {"check", "update", "vscode", "match", "balance", "sheet", "results", "pre", "post", "run"}
     argv = [a[2:] if a.startswith("--") and a[2:] in commands else a for a in sys.argv[1:]]
     args = ap.parse_args(argv)
 
@@ -596,7 +716,7 @@ def main() -> None:
         args.command, args.window, args.lookback_years = "run", "pre", 3.0
     elif args.command == "post":
         args.command, args.window, args.lookback_years = "run", "post", None
-    {"check": check, "update": update, "vscode": vscode, "match": match, "balance": balance, "sheet": sheet,
+    {"check": check, "update": update, "vscode": vscode, "match": match, "balance": balance, "sheet": sheet, "results": results,
      "run": run}[args.command](args)
 
 

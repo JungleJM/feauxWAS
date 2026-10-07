@@ -29,7 +29,7 @@ Cosmos (on the VM)                 build_group_parquet.py           MatchIt 10:1
 | | Cases | Controls |
 |------------------|------------------------------|------------------------------|
 | Who | D89.44 on at least one date (D24); 2+ dates as a sensitivity analysis | No D89.44 at any date (D5) |
-| Index date | First D89.44 (D4) | A sampled completed Office Visit in a case quarter (D6, D26) |
+| Index date | First D89.44 (D4) | One random completed Office Visit or Follow-Up from 2021-10-01 on (D30, D31) |
 | Age at index | `AgeKey` of the index diagnosis → `DurationDim.Years` | `AgeKey` of the index encounter → `DurationDim.Years` |
 
 Eligibility for both: at least 2 clinic-visit days in the 365 days before index (D8). Counts from the profile queries, 2026-10-01: 5,967 HaT patients, 3,693 of them with D89.44 on 2+ dates.
@@ -72,7 +72,7 @@ Balance: standardized mean difference under 0.1 for every variable (`cobalt::lov
 - drops the exposure codes, D89.44 by default (D11);
 - keeps one window relative to each patient's index: `pre` (with `--lookback-years 3`, the primary analysis), `post` (sensitivity) or `all`. The index day is in neither pre nor post (D12).
 
-pheauxWAS then fits, for each phecode with at least 20 cases, `phecode ~ HaT_Flag + AgeAtIndex + Sex + Race + Ethnicity + YearsBeforeIndex + ClinicVisits365Before`, as ordinary logistic regression on the matched cohort (D13). A person is a phecode case with the code on 2+ distinct dates; one-date people are excluded from that phecode.
+pheauxWAS then fits, for each phecode with at least 20 cases, `phecode ~ HaT_Flag + AgeAtIndex + Sex + Race + Ethnicity + YearsBeforeIndex + ClinicVisits365Before`, as ordinary logistic regression on the matched cohort (D13). The post and all windows add `YearsAfterIndex` (D40). A person is a phecode case with the code on 2+ distinct dates; one-date people are excluded from that phecode.
 
 **The runner** (`tutorial/run_phewas.py`, D33–D38) runs all of this with the VM's paths as defaults; on the VM it is typed as `python phewas <command>` (`phewas`, an extensionless Python file beside it, runs it; `--check` works as well as `check`):
 
@@ -81,7 +81,8 @@ pheauxWAS then fits, for each phecode with at least 20 cases, `phecode ~ HaT_Fla
 | `check` | lists what is present and missing: Python packages, Rscript and MatchIt, arrow, cobalt, dplyr, the files |
 | `match` | MatchIt into `runs/matching/` |
 | `balance` | the match on a page: every variable's standardized mean difference (as MatchIt's `summary()` computes it), unmatched cases by quarter, controls per case; also `runs/matching/balance.txt` |
-| `sheet` | one page on the whole study and the next command, in `runs/sheet.txt`; `match`, `pre` and `post` print it when they finish (D38) |
+| `sheet` | one page on the whole study and the next command, in `runs/sheet.txt`; `match` prints it when it finishes (D38). A YearsAfterIndex SMD over 0.1 does not hold up the next step (D40) |
+| `results` | one page on one PheWAS run (`results pre`, `results post`; default the latest), in `runs/<run>/sheet.txt`; `pre` and `post` print it when they finish: the model, inputs (HaT and controls, diagnoses, D89.44 rows removed), phecodes tested and significant (higher and lower in HaT), Firth count, FDR hits by category, the top 20 and the top 5 lower in HaT, phecodes whose names suggest the HaT workup, and the cross-check with separated phecodes (|beta| > 10) set apart |
 | `pre` | the 3 years before index into `runs/pre_3y/` (`run --window pre --lookback-years 3`) |
 | `post` | after index into `runs/post/` |
 | `update` | unpacks the newest `*bundle*.py` in the folder over the scripts |
@@ -115,7 +116,7 @@ The `hat_` pull ran on the VM on 2026-10-02 (D28). `tutorial/pulling-cohorts/HaT
 
 `hat_Patients` is everyone with any D89.44: every case (D24) and the control exclusion list (D5). Its index columns are prefixed `Index`; it also carries every PatientDim column. `hat_Encounters` carries `DepartmentSpecialty` and the site's `SiteFullyUsableInCosmos…` dates. `hat_Labs`' eight components and what each measures are in the blueprint's description; only 2287 (and maybe 59082) are baseline serum tryptase in ng/mL.
 
-**The `ctrl_` pull** (`tutorial/adapting-cosmos/ctrl_PheWAS_intake.yaml`, D30) has the same fact tables and columns, with `ctrl_Patients` as the PK: one random completed Office Visit or Follow-Up per patient from 2021-10-01 (the pseudo-index), excluding the uploaded `hat_patient_keys.parquet`. A hash of the patient key keeps about 1% of patients (`pool_permille: 10`), and `smallset` with `stop_at_for_pk_table: 300000` and `random_pk_sample` caps the pool at 300,000 in a reproducible hash order. Not yet run.
+**The `ctrl_` pull** (`tutorial/adapting-cosmos/ctrl_PheWAS_intake.yaml`, D30) has the same fact tables and columns, with `ctrl_Patients` as the PK: one random completed Office Visit or Follow-Up per patient from 2021-10-01 (the pseudo-index), excluding the uploaded `hat_patient_keys.parquet`. A hash of the patient key keeps about 1% of patients (`pool_permille: 10`), and `smallset` with `stop_at_for_pk_table: 300000` and `random_pk_sample` caps the pool at 300,000 in a reproducible hash order. Run on the VM 2026-10-06 (counts in the roadmap).
 
 DurationDim is a LEFT JOIN so that a missing age does not push a patient's index to a later D89.44. Not pulled: ProblemListFact (D9); EdVisitFact and HospitalAdmissionFact, which EncounterFact's flags cover.
 

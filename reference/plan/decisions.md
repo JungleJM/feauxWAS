@@ -210,10 +210,6 @@ Entries are grouped, numbered stably, and never renumbered. A reversed decision 
 
 **Decision.** `phewas.bat`, beside `run_phewas.py`, runs it: `.\phewas check`, `match`, `pre`, `post`, `update`. `pre` and `post` are the study's two windows (D12); `check` lists what is present and missing (Python packages, Rscript and the R packages, the files); `update` unpacks the newest `*bundle*.py` in the folder over the scripts. `vscode` points VSCodium's terminal and R extension at the newest R in its user settings, for every folder, since Rscript was not on its PATH. Anything new the VM must run becomes such a command, with its paths as defaults. The runner finds `Rscript` itself (the PATH, then `Program Files\R`), keeps mapped-drive paths as typed, and renames an unfinished run folder out of the way rather than refusing to start.
 
-------------------------------------------------------------------------
-
-## The Cosmos Pull
-
 
 ### D37. The short commands run through Python, not a .bat
 
@@ -228,6 +224,29 @@ Entries are grouped, numbered stably, and never renumbered. A reversed decision 
 **Context.** The matching log was long and hard to read off the VM (2026-10-07). The user asked that every step give, in at most a page, what is needed to judge it and move on, to copy into the chat.
 
 **Decision.** `python phewas sheet` writes `runs/sheet.txt`: the groups (size, eligible, why not), the match (largest standardized mean difference and any over 0.1, unmatched cases and their quarters, controls per case), each PheWAS run (inputs, phecodes tested and significant, the top eight with OR, interval, q and cases, and whether pyPheWAS and the Phecode 1.2 bridge agree), and the next command. `match`, `pre` and `post` print it when they finish. `python phewas balance` gives the match alone with every variable's standardized mean difference, computed as MatchIt's `summary()` does.
+
+### D39. A presentation narrative, kept beside the plan documents
+
+**Amends D27.**
+
+**Context.** The user presents the study to others and needs it told in one place: each phase's code, why each choice was made, and how to read the results (2026-10-07).
+
+**Decision.** `reference/phewasHistoryAndDecisions.md` restates the study for that purpose, pointing to D numbers. It is updated after each phase's results are discussed. The plan documents stay the source of truth; where the two differ, the narrative is corrected.
+
+### D40. The post-index PheWAS adjusts for follow-up after index
+
+**Context.** After matching (2026-10-07), every standardized mean difference was under 0.1 except `YearsAfterIndex`, at 0.102: HaT patients have slightly more follow-up after index. Diagnoses before index cannot depend on it; diagnoses after index can, since more follow-up is more chance to be coded.
+
+**Decision.** Windows that count diagnoses after index (`post`, `all`) add `YearsAfterIndex` to the covariates, in pheauxWAS, the Phecode 1.2 bridge and pyPheWAS alike. The primary pre-index model is unchanged. The match is kept as is.
+
+**Rejected.** Rematching with a tighter caliper: it would cost cases to fix one variable that only the sensitivity analysis needs.
+
+------------------------------------------------------------------------
+
+## The Cosmos Pull
+
+
+
 ### D14. One window for everyone: 2018-01-01 to 2026-06-01
 
 **Decision.** `min_date_key = 20180101`, `max_date_key = 20260601` (the latest Cosmos has; moved when Cosmos is refreshed). Cases and controls share the floor: a longer lookback for either would give it more chances to collect diagnoses.
