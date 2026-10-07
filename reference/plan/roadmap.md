@@ -33,6 +33,8 @@ When an item here is built, delete it from this file and describe the result in 
 
 ## Open Problems
 
+- **Criticisms of the design and analysis**: every one we can identify is in `reference/reports/HaT_PheWAS_review_2026-10-07.md`, section 8. The major ones: indication bias in the pre-index window, asymmetric index events, health-system and referral confounding (not matched or adjusted), residual healthcare intensity, and the outcome model ignoring the matched design (D13).
+
 - **Questions for the user's attending**: the index date and the case rule, in `Attending Questions.md`. Their answers may change D4 and D24.
 - **Sensitivity analyses** beyond post-index: high-utilization controls, symptom-adjacent controls (allergic, GI or immune diagnoses, no known HaT), and negative-control phenotypes. None designed.
 - **Conditional logistic regression** within matched sets, as a check on D13. pheauxWAS does not do it.

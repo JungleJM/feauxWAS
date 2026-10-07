@@ -2,7 +2,7 @@
 
 **Status report for clinical and statistical review — 2026-10-07**
 
-*Primary (pre-index) and sensitivity (post-index) PheWAS complete; further sensitivity analyses planned. Counts of 1–10 patients are masked (Cosmos small-cell rule). Section 9 lists the specific questions for reviewers.*
+*Primary (pre-index) and sensitivity (post-index) PheWAS complete; further sensitivity analyses planned. Counts of 1–10 patients are masked (Cosmos small-cell rule). Section 8 sets out every criticism we can identify, Section 10 the specific questions for reviewers.*
 
 ------------------------------------------------------------------------
 
@@ -190,31 +190,69 @@ All q < 1e-130. "—" = not among the top 20 on that window's summary sheet (val
 | Separated phecodes (|β| > 10 in either) | 26 | 32 |
 | Correlation excluding separated; max abs difference | **0.999**; 0.201 | **0.999**; 0.412 |
 
-The lower overall correlation arises solely from separated phecodes, where unpenalized ML estimates diverge and pyPheWAS's L1 penalty shrinks them toward zero.
+The lower overall correlation arises solely from separated phecodes, where unpenalized ML estimates diverge and pyPheWAS's L1 penalty shrinks them toward zero. The largest non-separated differences (0.20 pre, 0.41 post, in log-odds) are at large effects, where the L1 penalty shrinks most.
 
-## 7. Interpretation and Limitations
+**What this does and does not show.** It verifies the computation: phecode mapping, case counting, covariate handling and model fitting give the same answers in two independent implementations. It does **not** validate the study's own results directly, because the comparison is run under pyPheWAS's rules (Phecode 1.2 map, 1 code makes a case, no exclusions, no Firth). The study's phecodeX analysis, with its stricter case definition and exclusions, is a different analysis by design; its correctness rests on the same code paths verified here plus the tool's self-tests.
 
-**Interpretation.**
+## 7. Interpretation
 
 1. **Face validity.** The leading phenotypes (urticaria and flushing, anaphylaxis, insect and food allergy, dysautonomia/POTS, joint hypermobility, rhinitis/asthma, abdominal pain) match the multisystem phenotype described for HaT.
 2. **Indication, not causation, in the pre-index window.** HaT is diagnosed by testing, prompted by these symptoms; the very large pre-index odds ratios (20–60) largely reflect selection into testing. The pre-index results describe the phenotype preceding diagnosis.
 3. **Persistence after diagnosis.** Most leading phenotypes recur after index with similar or larger effects, arguing against purely transient workup. Shifts are as expected: tryptase-abnormal codes fall after diagnosis (testing precedes it), MCAS codes rise (coded in follow-up care), and Ehlers–Danlos codes appear post-index (plausibly after genetic evaluation).
 4. **Breadth and direction.** 47% (pre) and 54% (post) of tested phecodes are FDR-significant, and > 90% of those are higher in HaT. Beyond true phenotype, this indicates residual differences in healthcare intensity not captured by one year of office visits (specialist evaluation, testing cascades).
 
-**Limitations (for statistical review).**
+## 8. Criticisms and Limitations
 
-1. **Analysis ignores the matched design.** Unconditional, unweighted logistic regression on the matched cohort (D13): matched sets of 1–10 controls contribute unequally, and within-set correlation is not modelled. Conditional logistic regression, or weighted regression with cluster-robust SEs by matched set, would respect the design.
-2. **Utilization confounding.** Matching on office/follow-up visits in the year before index does not capture specialist, ED or testing intensity over the 3-year window; residual detection bias likely inflates "higher in HaT" associations broadly.
-3. **Index asymmetry.** Case index is a diagnostic event (often a specialist encounter after workup); control index is a random clinic visit. The pre-index window for cases is, by construction, the period of diagnostic evaluation.
-4. **Control misclassification.** HaT has an estimated population prevalence of ~4–6% and is under-diagnosed; untested controls include undiagnosed HaT, biasing associations toward the null (non-differential, modest).
-5. **Case definition.** Single-code cases may include rule-out or erroneous codes not flagged by status; the ≥ 2-date sensitivity analysis addresses this.
-6. **Exposure-adjacent codes** inflate the top of the list and share patients with related phecodes; a sensitivity analysis removing all D89.4x is planned.
-7. **Multiplicity and dependence.** Bonferroni and BH treat phecodes as separate tests, but rolled-up parent and child phecodes are strongly dependent; counts of significant phecodes overstate distinct findings.
-8. **Population differences.** ~75% of cases are female and the population likely differs socioeconomically; lower tobacco, substance use and diabetes in HaT are more plausibly residual confounding than protection.
-9. **Selection by eligibility.** 29% of HaT patients excluded by the prior-utilization rule; 119 cases indexed before October 2021 excluded.
-10. **Extreme p-values.** With n ≈ 32,000 and large effects, many p-values underflow; ranking among the top hits should rely on effect sizes and intervals, not p.
+Every weakness we can identify, so reviewers can weigh the results against them. Each item gives the problem, the likely direction of bias, what the study does now, and what would address it. Items marked **(major)** could change the main conclusions.
 
-## 8. Planned Sensitivity Analyses
+### 8.1 Design and bias
+
+1. **Indication (protopathic) bias in the pre-index window (major).** HaT is diagnosed because symptomatic patients are tested; the 3 years before index are, for cases, the period of symptoms and workup that led to testing. *Bias:* away from the null, very large. *Now:* framed as "phenotype preceding diagnosis", not effects of HaT; post-index window as a check. *Remedy:* cannot be removed in this design; a population with systematic testing (e.g. genotyped biobank) would be needed for causal claims.
+2. **Asymmetric index events (major).** A case's index is a diagnostic event, often at a specialist after a workup; a control's is a random office visit. The windows on either side of these anchors are not exchangeable: cases' pre-index windows are dense with evaluation, controls' are ordinary care. *Bias:* away from the null, broadly. *Now:* index day excluded; utilization matched on prior-year office visits. *Remedy:* anchor controls on a comparable evaluative encounter (e.g. an allergy/immunology visit), or lag the pre-index window (e.g. exclude the 6–12 months before index).
+3. **Health-system and referral confounding (major).** HaT is diagnosed mainly at centres with mast-cell expertise; cases are therefore concentrated in particular health systems with their own coding practices and specialist density, while controls are drawn at random across Cosmos. Health system, region and payer are **not** matched or adjusted. *Bias:* unpredictable, potentially large for coding-sensitive phecodes. *Remedy:* match or stratify on health system (or at least region), or restrict controls to the systems that diagnose HaT.
+4. **Residual healthcare-intensity confounding (major).** Matching on office/follow-up visit days in the year before index does not capture specialist visits, ED use, testing intensity, or the 3-year window. *Evidence:* 91–98% of significant phecodes are higher in HaT, including many with no known link to HaT. *Bias:* away from the null, broad. *Remedy:* adjust or match on specialist and ED visits, or on diagnosis counts from outside the analysis window; use negative-control outcomes to calibrate the background excess.
+5. **Control misclassification.** Controls are not genotyped; HaT affects an estimated 4–6% of the population and is under-diagnosed, so some controls have HaT. *Bias:* toward the null, modest and non-differential. *Remedy:* exclude controls with elevated baseline tryptase (few have one measured); accept as a stated limitation.
+6. **Case misclassification.** A single D89.44 may be a rule-out, an error, or carried forward without confirmation; no genetic results are available. *Bias:* toward the null if non-cases are included. *Now:* status filter for ruled-out/error codes. *Remedy:* ≥ 2-date sensitivity analysis; tryptase ≥ 8 ng/mL as supporting evidence.
+7. **The diagnosis-status filter is unverified on the real data.** Statuses containing "rule", "error", "delete" or "cancel" are dropped, but the actual status values in Cosmos (listed in the build reports) have not yet been reviewed. *Effect:* if real spellings differ, rule-out codes may remain as diagnoses (or valid ones may be dropped). *Remedy:* review `hat_group_report.txt` and `control_group_report.txt` before final analysis.
+8. **Selection by eligibility.** 29% of HaT patients fail the prior-utilization rule and 119 indexed before October 2021 are excluded; results describe HaT patients engaged in care before diagnosis, diagnosed after the code existed. *Remedy:* report characteristics of excluded cases; a sensitivity analysis with a relaxed utilization rule.
+9. **Calendar and code-introduction effects.** D89.44 exists only from October 2021; earlier HaT diagnoses carry other codes (D89.40/D89.49), so some "controls" and some cases' histories may contain HaT under other codes. *Effect:* exposure-adjacent contamination of outcomes (see 8.3.2) and possible earlier true index. *Remedy:* report earlier D89.4x codes among cases (recorded by the builder); treat D89.4x as exposure-adjacent.
+10. **Population differences not modelled.** ~75% of cases are female; socioeconomic status, insurance and region are unmeasured. Lower tobacco, substance use, diabetes and hypertension in HaT are more plausibly residual confounding than protection.
+11. **Control pool representativeness.** Controls are a hash-based ~1% sample of Cosmos patients with a clinic visit from October 2021, capped at 300,000. The sample is reproducible and not obviously biased, but its representativeness of Cosmos has not been checked against Cosmos-wide distributions.
+
+### 8.2 Matching
+
+1. **The outcome model ignores the matched design (major for inference).** Unconditional, unweighted logistic regression on the matched cohort (D13): sets with 1 to 10 controls contribute unequally, MatchIt's weights are not used, and within-set correlation is not modelled. *Effect:* estimates are for a population weighted toward cases with many controls; standard errors may be mis-stated. *Remedy:* conditional logistic regression on matched sets, or weighted regression with cluster-robust SEs by set; at minimum, compare.
+2. **Variable ratio.** 342 cases have 1 control, 2,210 have 10. Cases who matched poorly (crowded quarters) are represented by few controls. *Remedy:* as 8.2.1; report results restricted to full 10:1 sets.
+3. **Caliper scale.** 0.2 SD of the propensity score on the probability scale, not the logit (Austin's recommendation). With small propensities, the probability-scale caliper is tighter in some regions and looser in others. *Remedy:* refit with `link = "linear.logit"`; compare balance and unmatched counts.
+4. **Propensity model specification.** Main effects only, linear in age and record length; no interactions. Balance was checked on means (SMD) only, not on variances or distributions beyond MatchIt's summary. *Remedy:* report variance ratios and eCDF statistics (available in the MatchIt log); add splines if imbalance appears.
+5. **Imperfect balance on follow-up.** YearsAfterIndex SMD 0.102; adjusted in the post-index model only (D40).
+6. **Pair-level differences.** Std. pair distances are large (e.g. age 1.25 SD): group means balance, individual pairs do not. Acceptable for group comparison with regression adjustment, but relevant if conditional analysis is adopted.
+
+### 8.3 Outcomes
+
+1. **Unequal observation time.** The pre-index window is nominally 3 years, but patients with less than 3 years of prior record get a truncated window (adjusted only through `YearsBeforeIndex`). The post-index window varies with follow-up (adjusted through `YearsAfterIndex`). Logistic regression on "ever coded" does not model time at risk. *Remedy:* require ≥ 3 years of prior observation; for post, model rates (Poisson/negative binomial with an offset) or fix the window length.
+2. **Exposure-adjacent outcomes (major for presentation).** MCAS (D89.40–D89.49), raised tryptase (R74.8) and mastocytosis (D47.0x, C96.2x) codes lead the results; they are part of the diagnostic pathway, not independent phenotypes. *Remedy:* planned sensitivity analysis removing them; report separately.
+3. **Phecode hierarchy.** Child phecodes roll up into parents, so parent and child hits share patients; 482 or 863 significant phecodes are far fewer distinct findings. *Remedy:* report leaf-level or collapsed results; cluster related phecodes.
+4. **Two-date case rule and exclusions.** A phecode case needs codes on 2+ dates; 1-date patients and those with related phecodes are excluded from that phecode's analysis, so the comparison group differs by phecode. Standard PheWAS practice, but it means denominators vary and exclusions can themselves differ by group.
+5. **Coding, not disease.** Outcomes are billing codes; differences in coding thoroughness between specialist and primary care settings translate directly into "associations".
+
+### 8.4 Statistics
+
+1. **Odds ratios exaggerate risk ratios for common outcomes.** Several phecodes are common (allergy: 6,803 cases, ~21% of the cohort); ORs overstate relative risks there. *Remedy:* report absolute prevalences in each group, or risk ratios for common phecodes.
+2. **Firth fits for 26–29% of tested phecodes.** These report Wald intervals with penalized likelihood-ratio p-values, which can disagree; profile-likelihood intervals would be consistent. Some separation arises from sparse covariate levels (small race/ethnicity groups) rather than the exposure.
+3. **Multiplicity under dependence.** Bonferroni is very conservative with correlated phecodes; BH assumes positive dependence (likely acceptable). Hierarchical FDR would match the structure better.
+4. **Extreme p-values.** Many underflow (q < 1e-300); they carry no ranking information. Effect sizes and intervals should be the basis of interpretation.
+5. **Winner's curse.** Effect sizes for the top hits are selected for being extreme and will tend to shrink on replication.
+6. **No replication.** A single discovery analysis; no independent cohort, held-out sample, or negative-control outcomes yet.
+
+### 8.5 Data and implementation
+
+1. **Cosmos data quality.** Multi-organization EHR data with varying coding practices, missing race/ethnicity grouped as "Unknown", and site participation changing over time (sites' Cosmos-usable dates are pulled but not yet used to restrict observation).
+2. **Pull window.** History starts 2015-01-01; a patient whose first D89.44 predates 2015 gets a later index (rare, since the code dates from 2021, but relevant to earlier D89.4x codes).
+3. **Custom software.** The study's PheWAS runs on pheauxWAS, a purpose-written tool. It is verified against pyPheWAS (Section 6.5, r = 0.999 on comparable phecodes) and by self-tests, but it is not a published package. A fix during this work (v1.1.1) added detection of separation when all of a phecode's cases are exposed; earlier synthetic results were unchanged.
+4. **Small cells.** Cosmos restricts publication of counts of 1–10 patients; phecodes near the 20-case minimum may have exposure-group cells under 11 and need masking before publication.
+
+## 9. Planned Sensitivity Analyses
 
 | Analysis | Question | Change |
 |---|---|---|
@@ -223,8 +261,13 @@ The lower overall correlation arises solely from separated phecodes, where unpen
 | Conditional logistic regression (or weighted, cluster-robust) | Is inference robust to respecting the matched design? | Model |
 | Controls with baseline tryptase > 8 ng/mL removed | Effect of possible undiagnosed HaT among controls | Control eligibility; rematch |
 | Broader utilization adjustment (specialist/ED visits, test counts) | How much of the breadth is healthcare intensity? | Covariates |
+| Health system / region matching or stratification | Is the breadth driven by where HaT is diagnosed? | Matching; needs organization or region from Cosmos |
+| Lagged pre-index window (e.g. exclude the 6–12 months before index) | Are pre-index hits workup immediately before diagnosis? | Window |
+| Require ≥ 3 years of prior observation | Effect of truncated pre-index windows | Eligibility |
+| Logit-scale caliper; restrict to full 10:1 sets | Sensitivity to matching choices | Matching |
+| Negative-control outcomes | Calibrate the background excess from healthcare intensity | Interpretation |
 
-## 9. Questions for Reviewers
+## 10. Questions for Reviewers
 
 **Clinical (attending).**
 
@@ -241,6 +284,8 @@ The lower overall correlation arises solely from separated phecodes, where unpen
 3. Multiplicity across a hierarchy of dependent phecodes: report at leaf level, collapse to parents, or use a hierarchical FDR?
 4. Utilization adjustment: which additional measures of healthcare intensity are appropriate without conditioning on outcomes?
 5. Reporting extreme associations: preferred presentation when p underflows and Firth is used for ~26% of fitted phecodes.
+6. Health-system confounding (8.1.3): match, stratify, or restrict controls to diagnosing systems?
+7. Time at risk (8.3.1): require full windows, or model rates?
 
 ------------------------------------------------------------------------
 
