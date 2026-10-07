@@ -40,6 +40,7 @@ import argparse
 from pathlib import Path
 
 import pandas as pd
+import pyarrow.parquet as pq
 
 
 def main() -> None:
@@ -56,24 +57,32 @@ def main() -> None:
     args = ap.parse_args()
 
     people = pd.read_parquet(args.cohort)
-    dx = pd.concat([pd.read_parquet(f) for f in args.diagnoses], ignore_index=True)
-    n_start = len(dx)
+    exclude = {c.strip().upper() for c in args.exclude_codes}
 
-    dx = dx[dx["PatientDurableKey"].isin(people["PatientDurableKey"])]
-    n_in_cohort = len(dx)
+    # Read only the matched patients' rows, one file at a time, and test the codes
+    # once per distinct code: the control file holds about 90 million rows.
+    n_start = n_in_cohort = n_excluded = 0
+    kept = []
+    for f in args.diagnoses:
+        n_start += pq.read_metadata(f).num_rows
+        part = pq.read_table(f, filters=[("PatientDurableKey", "in", people["PatientDurableKey"].unique())],
+                             read_dictionary=["DiagnosisCode", "Vocabulary"]).to_pandas()
+        n_in_cohort += len(part)
+        code = part["DiagnosisCode"]
+        excluded = code.isin([c for c in code.cat.categories if str(c).strip().upper() in exclude])
+        n_excluded += int(excluded.sum())
+        part = part[~excluded]
 
-    excluded = dx["DiagnosisCode"].astype(str).str.strip().str.upper().isin(
-        [c.strip().upper() for c in args.exclude_codes])
-    dx = dx[~excluded]
-
-    days = dx["DaysFromIndex"]
-    if args.window == "pre":
-        keep = days < 0
-        if args.lookback_years:
-            keep &= days >= -args.lookback_years * 365.25
-        dx = dx[keep]
-    elif args.window == "post":
-        dx = dx[days > 0]
+        days = part["DaysFromIndex"]
+        if args.window == "pre":
+            keep = days < 0
+            if args.lookback_years:
+                keep &= days >= -args.lookback_years * 365.25
+            part = part[keep]
+        elif args.window == "post":
+            part = part[days > 0]
+        kept.append(part.astype({"DiagnosisCode": object, "Vocabulary": object}))
+    dx = pd.concat(kept, ignore_index=True)
 
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -85,7 +94,7 @@ def main() -> None:
     print(f"people:     {len(people):>8} rows -> {people_csv}")
     print(f"diagnoses:  {n_start:>8} rows in the group files")
     print(f"            {n_in_cohort:>8} rows for matched patients")
-    print(f"            {int(excluded.sum()):>8} rows dropped as exposure codes {args.exclude_codes}")
+    print(f"            {n_excluded:>8} rows dropped as exposure codes {args.exclude_codes}")
     lookback = f", {args.lookback_years:g}-year lookback" if args.window == "pre" and args.lookback_years else ""
     print(f"            {len(dx):>8} rows kept in window '{args.window}'{lookback} -> {events_csv}")
 

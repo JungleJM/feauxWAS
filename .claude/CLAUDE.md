@@ -56,6 +56,10 @@ The user works in this cycle; follow it for any change bigger than a small fix.
 - Study-design decisions come from this repo and the user. The Telescope project (`/Users/jmath/Documents/code/telescope`) is used for its pull-YAML format, its validator and its data dictionary, nothing else (D3). Do not write into it without asking.
 - `pheauxWAS.py` stays a single file needing only Python 3.7+ and numpy.
 
+## Commands For The VM
+
+Everything run on the VM is typed by hand. Every instruction for it, in chat and in the plan documents, is one or two words: `.\phewas <command>` from the pheauxWAS folder (D36). A step that needs more is added as a command to `tutorial/run_phewas.py` (with `phewas.bat` beside it), with its paths as defaults; never hand over a long command, a long path or a full PACK_ID to type. New or changed scripts reach the VM in a bundle that `.\phewas update` unpacks; to compare a PACK_ID, give its first 8 characters.
+
 ## Working Conventions
 
 - On the Mac, scripts that need pandas or pyarrow run as `uv run --with pandas --with pyarrow python ...`; R scripts as `Rscript` (MatchIt, arrow, cobalt, dplyr). Validate the pull with Telescope: `python3.13 scripts/makeYaml.py --template <intake> --validate`, run from the Telescope folder; it writes nothing.

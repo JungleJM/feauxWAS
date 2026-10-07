@@ -182,6 +182,34 @@ Entries are grouped, numbered stably, and never renumbered. A reversed decision 
 
 **Decision.** MatchIt keeps 10 controls per case (about 60,000 for 5,967 cases); everything else in D7 stands.
 
+### D33. One runner, two commands: match, then run
+
+**Context.** After the group files, the steps were separate commands typed with long paths: MatchIt, `prepare_phewas_inputs.py`, then pheauxWAS. The user asked (2026-10-06) for the PheWAS commands in one script, each tool writing to its own folder under `runs/`.
+
+**Decision.** `tutorial/run_phewas.py` has two commands. `match` runs `matchit_example.R` on the two group files and writes `runs/matching/`. `run` starts from that matched cohort, applies one window with `prepare_phewas_inputs.py`, runs every tool, and writes `runs/<name>/`, one folder per tool, with a log of every command. Matching stays a separate command so its balance is read before anything runs on it. The runner adds no analysis of its own, and it refuses to overwrite an existing run folder.
+
+**Rejected.** One command that matches and runs the PheWAS: nothing would stop a run on a poorly balanced cohort.
+
+### D34. pyPheWAS is a cross-check, bridged by pheauxWAS on Phecode 1.2
+
+**Context.** pyPheWAS (2a8fff1) is a different analysis: Phecode 1.2 with its ICD-10 beta map (no D89.44), a case on one code, no exclusions, L1-penalized logistic regression (alpha 0.1), 5 cases minimum. Its results cannot be compared phecode by phecode with the study's phecodeX run.
+
+**Decision.** The runner makes three runs on the same windowed events: `pheauxwas/` (the study's result), `pyphewas/`, and `pheauxwas_phecode12/`, which is pheauxWAS on pyPheWAS's own map with pyPheWAS's rules. The last two should agree phecode for phecode, and `pheauxWAS.py --compare` lines them up in `comparison/`. pyPheWAS is skipped, with a message, when its packages are missing.
+
+### D35. The runner's defaults are the VM's layout
+
+**Context.** On the VM the repo root holds `hat_phewas_parquets/` and `control_phewas_parquets/`, the builder's outputs for each group.
+
+**Decision.** The runner's default paths are those folders' files, relative to the repo root (`--root`, the current folder by default), so on the VM `python run_phewas.py match` and `python run_phewas.py run --window pre --lookback-years 3` need no paths. The tutorial passes its synthetic paths explicitly.
+
+**Amended by D36:** the root defaults to the runner's own folder when `pheauxWAS/` is there.
+
+### D36. On the VM, every command is one or two words
+
+**Context.** Everything on the VM is typed by hand; long commands, paths and PACK_IDs were hard to type and easy to get wrong (2026-10-06).
+
+**Decision.** `phewas.bat`, beside `run_phewas.py`, runs it: `.\phewas check`, `match`, `pre`, `post`, `update`. `pre` and `post` are the study's two windows (D12); `check` lists what is present and missing (Python packages, Rscript and the R packages, the files); `update` unpacks the newest `*bundle*.py` in the folder over the scripts. `vscode` points VSCodium's terminal and R extension at the newest R in its user settings, for every folder, since Rscript was not on its PATH. Anything new the VM must run becomes such a command, with its paths as defaults. The runner finds `Rscript` itself (the PATH, then `Program Files\R`), keeps mapped-drive paths as typed, and renames an unfinished run folder out of the way rather than refusing to start.
+
 ------------------------------------------------------------------------
 
 ## The Cosmos Pull

@@ -114,3 +114,18 @@ python3 pheauxWAS/pheauxWAS.py \
 For each phecode, a patient is a phecode case with its codes on 2 or more distinct dates; patients with one date are left out of that phecode, and so are those with related phecodes or the wrong sex for it. Phecodes with fewer than 20 cases are skipped. Each remaining phecode gets a logistic regression, `phecode ~ HaT_Flag + covariates`; the `OR` column is HaT's odds ratio, adjusted. Read results by `q_fdr` (or `bonferroni`), not raw `p`: hundreds of phecodes are tested.
 
 Two caveats belong in any write-up. The matched sets are not used in the regression: it is ordinary adjusted logistic regression on a matched cohort, not conditional logistic regression. And controls are "no known HaT", not proven non-HaT.
+
+## 6. All At Once: The Runner
+
+`run_phewas.py` does steps 3–5 in two commands, and also runs pyPheWAS on the same events. Each tool writes to its own folder under `runs/`. On the VM its defaults are the real files, so it needs no paths. Here, give it the synthetic ones:
+
+``` bash
+python3 tutorial/run_phewas.py match \
+  --hat tutorial/synthetic_cosmos/hat/hat_group.parquet \
+  --control tutorial/synthetic_cosmos/ctrl/control_group.parquet
+python3 tutorial/run_phewas.py run --window pre --lookback-years 3 \
+  --hat-diagnoses tutorial/synthetic_cosmos/hat/hat_group_diagnoses.parquet \
+  --control-diagnoses tutorial/synthetic_cosmos/ctrl/control_group_diagnoses.parquet
+```
+
+Read the balance in `runs/matching/` before the second command. `runs/pre_3y/` then holds `pheauxwas/` (the results above), `pyphewas/`, `pheauxwas_phecode12/` (pheauxWAS run the way pyPheWAS works, on its map), `comparison/` (the last two side by side; they should agree phecode for phecode) and `run_log.txt`. pyPheWAS needs statsmodels, matplotlib and tqdm; without them the runner skips it and says so.

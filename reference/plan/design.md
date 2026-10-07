@@ -62,15 +62,41 @@ matchit(HaT_Flag ~ AgeAtIndex + YearsBeforeIndex + YearsAfterIndex +
 
 Balance: standardized mean difference under 0.1 for every variable (`cobalt::love.plot`). Unmatched cases are reviewed: if quarter is too strict, year is the fallback.
 
+`tutorial/matchit_example.R` runs it. With no arguments it matches the tutorial's synthetic groups into `tutorial/work/`; given `<hat_group.parquet> <control_group.parquet> <out folder>` it matches those. For the study, `run_phewas.py match` passes the VM's files and writes `runs/matching/`.
+
 ### The PheWAS
 
 `tutorial/prepare_phewas_inputs.py` turns the matched cohort and both groups' diagnosis files into pheauxWAS's CSVs:
 
-- keeps only diagnoses of patients in the matched cohort;
+- keeps only diagnoses of patients in the matched cohort, reading only their rows from each file and testing the exposure codes once per distinct code (the control file holds about 90 million rows);
 - drops the exposure codes, D89.44 by default (D11);
 - keeps one window relative to each patient's index: `pre` (with `--lookback-years 3`, the primary analysis), `post` (sensitivity) or `all`. The index day is in neither pre nor post (D12).
 
 pheauxWAS then fits, for each phecode with at least 20 cases, `phecode ~ HaT_Flag + AgeAtIndex + Sex + Race + Ethnicity + YearsBeforeIndex + ClinicVisits365Before`, as ordinary logistic regression on the matched cohort (D13). A person is a phecode case with the code on 2+ distinct dates; one-date people are excluded from that phecode.
+
+**The runner** (`tutorial/run_phewas.py`, D33–D36) runs all of this with the VM's paths as defaults; on the VM it is typed as `.\phewas <command>` (`phewas.bat` beside it):
+
+| Command | Does |
+|---|---|
+| `check` | lists what is present and missing: Python packages, Rscript and MatchIt, arrow, cobalt, dplyr, the files |
+| `match` | MatchIt into `runs/matching/` |
+| `pre` | the 3 years before index into `runs/pre_3y/` (`run --window pre --lookback-years 3`) |
+| `post` | after index into `runs/post/` |
+| `update` | unpacks the newest `*bundle*.py` in the folder over the scripts |
+| `vscode` | points VSCodium (and VS Code, if installed) at the newest R in its user settings (`%APPDATA%\VSCodium\User\settings.json`, every folder): the terminal's PATH, the R extension (`r.rpath.windows`, `r.rterm.windows`) and Code Runner; keeps other settings and backs the old file up |
+
+`run --window <w>` takes any window. `Rscript` is found on the PATH or under `Program Files\R`, and paths keep their mapped drive letter. Each PheWAS run folder holds:
+
+| Folder | What |
+|---|---|
+| `inputs/` | `prepare_phewas_inputs.py`'s people and windowed events |
+| `pheauxwas/` | the study's PheWAS: phecodeX, the rules above |
+| `pheauxwas_phecode12/` | pheauxWAS on pyPheWAS's Phecode 1.2 ICD-10 map with pyPheWAS's rules: one code makes a case, no exclusions, no rollup, no sex limits, 5 cases, no Firth (D34) |
+| `pyphewas/` | pyPheWAS's `pyPhewasPipeline`, unmodified, on the same events: `group.csv` (with `MaxAgeAtVisit` = age at `ObservationEndDate`) and `icds.csv` (`AgeAtICD` from `DiagnosisDate` and `BirthDate`); target `HaT_Flag`, the same covariates. Its two feature-matrix CSVs are deleted unless `--keep-feature-matrices` |
+| `comparison/` | `pheauxWAS.py --compare` of `pheauxwas_phecode12` against `pyphewas` |
+| `run_log.txt` | every command, its time and its ending; each folder has its step's `console.txt` |
+
+A finished run folder stops the run; an unfinished one (a failed try) is renamed `<name>_unfinished_<time>`. pyPheWAS is skipped with a message when it does not import (statsmodels, matplotlib, tqdm); the runner then exits 1, after the pheauxWAS runs. On the synthetic data the bridge and pyPheWAS agree to within 0.002 in beta on every phecode both test.
 
 ------------------------------------------------------------------------
 
@@ -107,7 +133,7 @@ Then validate the intake again.
 
 ## The Tools
 
-**pheauxWAS** (`pheauxWAS/pheauxWAS.py`, 1.1.0): one Python file needing only numpy. It maps ICD events to phecodes (rolling child phecodes up to parents), defines cases, exclusions and controls for each phecode, fits logistic regression (Firth when separation is detected, `--firth auto`), corrects with Bonferroni and FDR, and writes a results CSV, an SVG Manhattan plot and a run log with the SHA-256 of the script and every input. Vocabulary values are normalized (`ICD-10-CM` reads as `ICD10CM`). It has no option to drop a phecode or to window events by date: both are done before it (`prepare_phewas_inputs.py`). `--make-test-data`, `--compare` and `--selftest` build and check a cross-tool synthetic dataset.
+**pheauxWAS** (`pheauxWAS/pheauxWAS.py`, 1.1.1): one Python file needing only numpy. It maps ICD events to phecodes (rolling child phecodes up to parents), defines cases, exclusions and controls for each phecode, fits logistic regression (Firth when separation is detected, `--firth auto`), corrects with Bonferroni and FDR, and writes a results CSV, an SVG Manhattan plot and a run log with the SHA-256 of the script and every input. Vocabulary values are normalized (`ICD-10-CM` reads as `ICD10CM`). It has no option to drop a phecode or to window events by date: both are done before it (`prepare_phewas_inputs.py`). Separation is also detected when the predictor is 0/1 and one of its four cells with the outcome is empty (a phecode whose cases are all exposed); ML's own checks can miss that, as they did for `BI_180` (all cases HaT, via the earlier D89.4x codes) on a 67,000-person copy of the synthetic data. An odds ratio or bound too large to write is written as `NA`. `--make-test-data`, `--compare` and `--selftest` build and check a cross-tool synthetic dataset.
 
 **pyPheWAS** (`pyPheWAS-2a8fff1/`): the published package at commit 2a8fff1, with lookup, model and plot steps and its own control matcher (`maximizeControls`). Used to cross-check pheauxWAS.
 

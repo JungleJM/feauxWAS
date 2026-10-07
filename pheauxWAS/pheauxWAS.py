@@ -87,7 +87,7 @@ from collections import Counter, defaultdict
 from xml.sax.saxutils import escape as xml_escape
 
 __PROG__ = "pheauxWAS"
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 try:
     import numpy as np
@@ -743,10 +743,29 @@ def wald_p(z):
     return math.erfc(abs(z) / math.sqrt(2.0))
 
 
+def _empty_cell(x, y):
+    """True when x is 0/1 and one of its four cells with y is empty: quasi-complete
+    separation (e.g. a phecode whose cases are all exposed), which ML's own checks
+    can miss because its likelihood flattens out before they trigger."""
+    if not np.all((x == 0) | (x == 1)):
+        return False
+    return any(not np.any((x == a) & (y == b)) for a in (0, 1) for b in (0, 1))
+
+
+def _exp(v):
+    """exp() for an odds ratio or its bound; inf where it overflows."""
+    try:
+        return math.exp(v)
+    except OverflowError:
+        return float("inf")
+
+
 def run_model(X, y, firth_mode):
     """Fit y ~ X; the predictor of interest is column 1."""
     if firth_mode != "always":
         r = fit_logistic(X, y)
+        if r["ok"] and _empty_cell(X[:, 1], y):
+            r["separation"] = True
         if r["ok"] and (not r["separation"] or firth_mode == "never"):
             b, s = float(r["beta"][1]), float(r["se"][1])
             if not (s > 0 and np.isfinite(s)):
@@ -882,7 +901,7 @@ def write_manhattan(path, rows, title, alpha, n_labels):
         x, y = px(i), py(ys[i])
         c = color[r["_cat"]]
         tip = xml_escape("%s %s | OR=%.3g p=%.3g cases=%d"
-                         % (r["phecode"], r["description"], math.exp(r["beta"]),
+                         % (r["phecode"], r["description"], _exp(r["beta"]),
                             r["p"], r["n_cases"]))
         if r["beta"] >= 0:
             pts_s = "%.1f,%.1f %.1f,%.1f %.1f,%.1f" % (x, y - 4.5, x - 4, y + 3, x + 4, y + 3)
@@ -1219,7 +1238,7 @@ def run(args):
             "%d FDR<%g" % (pred, len(tested), n_firth, n_b, n_f, args.alpha))
         for r in sorted(tested, key=lambda r: r["p"])[:10]:
             log("   %-8s OR=%-8.3g p=%-10.3g cases=%-7d %s"
-                % (r["phecode"], math.exp(r["beta"]), r["p"], r["n_cases"],
+                % (r["phecode"], _exp(r["beta"]), r["p"], r["n_cases"],
                    r["description"][:60]))
         safe = re.sub(r"[^A-Za-z0-9_.-]", "_", pred)
         svg = "%s_%s_manhattan.svg" % (args.out, safe)
@@ -1245,9 +1264,9 @@ def run(args):
                 r["predictor"], r["phecode"], r["description"], r["category"],
                 r["sex_restriction"], r["n_total"], r["n_cases"], r["n_controls"],
                 r["n_excluded"], _fmt(r["beta"]), _fmt(r["se"]),
-                _fmt(math.exp(r["beta"]) if has else None),
-                _fmt(math.exp(r["lo"]) if has else None),
-                _fmt(math.exp(r["hi"]) if has else None),
+                _fmt(_exp(r["beta"]) if has else None),
+                _fmt(_exp(r["lo"]) if has else None),
+                _fmt(_exp(r["hi"]) if has else None),
                 _fmt(r["p"], "%.4g"), _fmt(r["q"], "%.4g"),
                 "" if r["bonferroni"] is None else ("TRUE" if r["bonferroni"] else "FALSE"),
                 r["model"], "" if r["converged"] == "" else str(bool(r["converged"])).upper(),
@@ -1810,6 +1829,49 @@ def selftest():
           "min null p=%.3g" % min(nulls))
     check("outputs written", os.path.isfile(os.path.join(tmp, "st_results.csv"))
           and os.path.isfile(os.path.join(tmp, "st_snp_manhattan.svg")))
+    # 4b. a phecode whose cases are all exposed (as a mast-cell phecode is in the
+    # HaT study): ML's checks missed this quasi-complete separation, and the huge
+    # interval it reported then crashed the results file (exp overflow)
+    sd = os.path.join(tmp, "separated")
+    os.makedirs(sd)
+    Ns = 3000
+    expo = (np.arange(Ns) < 300).astype(int)
+    with open(os.path.join(sd, "people.csv"), "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["person_id", "expo", "age"])
+        for i in range(Ns):
+            w.writerow(["S%05d" % i, expo[i], "%.1f" % rs.normal(50, 10)])
+    with open(os.path.join(sd, "map.csv"), "w", newline="") as f:
+        csv.writer(f).writerows([["icd10cm", "phecode"], ["T90.0", "900"], ["T91.0", "901"]])
+    with open(os.path.join(sd, "defs.csv"), "w", newline="") as f:
+        csv.writer(f).writerows([["phecode", "phenotype", "phecode_exclude_range", "sex", "category"],
+                                 ["900", "Only the exposed", "", "Both", "other"],
+                                 ["901", "Anyone", "", "Both", "other"]])
+    with open(os.path.join(sd, "events.csv"), "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["person_id", "vocabulary_id", "code", "date"])
+        for i in range(Ns):
+            if expo[i] and i % 2:
+                w.writerows([["S%05d" % i, "ICD10CM", "T90.0", d] for d in ("2020-01-01", "2020-02-01")])
+            if rs.uniform() < 0.15:
+                w.writerows([["S%05d" % i, "ICD10CM", "T91.0", d] for d in ("2020-01-01", "2020-02-01")])
+    sep_argv = ["--people", os.path.join(sd, "people.csv"), "--predictors", "expo", "--covars", "age",
+                "--events", os.path.join(sd, "events.csv"), "--map", os.path.join(sd, "map.csv"), "ICD10CM",
+                "--definitions", os.path.join(sd, "defs.csv"), "--no-hash"]
+    bys = {r["phecode"]: r for r in run(build_parser().parse_args(
+        sep_argv + ["--out", os.path.join(sd, "auto")]))}
+    check("all cases exposed: separation found, Firth used",
+          bys["900"]["model"] == "firth" and np.isfinite(bys["900"]["beta"]) and bys["900"]["p"] < 1e-5,
+          "model=%s beta=%s" % (bys["900"]["model"], bys["900"]["beta"]))
+    try:
+        run(build_parser().parse_args(sep_argv + ["--firth", "never", "--out", os.path.join(sd, "never")]))
+        with open(os.path.join(sd, "never_results.csv"), newline="") as f:
+            rd = {r["phecode"]: r for r in csv.DictReader(f)}
+        check("an overflowing OR bound is written as NA, not a crash",
+              rd["900"]["OR_upper95"] == "NA" and rd["901"]["OR_upper95"] != "NA",
+              "900: %s" % rd["900"]["OR_upper95"])
+    except OverflowError as e:
+        check("an overflowing OR bound is written as NA, not a crash", False, repr(e))
     # 5. test-data generator + comparison round trip
     td = os.path.join(tmp, "testdata")
     make_test_data(td, n=4000, seed=7)

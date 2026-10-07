@@ -10,23 +10,23 @@ When an item here is built, delete it from this file and describe the result in 
 
 | Part | State |
 |------------------------------------|------------------------------------|
-| pheauxWAS 1.1.0 and pyPheWAS 2a8fff1 | Built; pheauxWAS `--selftest` passes (2026-10-01). The comparison against pyPheWAS on real-shaped data was not rerun |
+| pheauxWAS 1.1.1 and pyPheWAS 2a8fff1 | Built; pheauxWAS `--selftest` passes (2026-10-06), with the separation fix (design.md) |
+| `run_phewas.py` (D33–D36) | Built; run end to end on the synthetic data under the VM's pandas 2.2.3 and numpy 2.1.3: the study run matches the tutorial's results, and the Phecode 1.2 bridge agrees with pyPheWAS within 0.002 in beta. On a 67,000-person, 4.3-million-event copy, pheauxWAS took 8 s and pyPheWAS 1.5 min. On the VM, `match` first failed to start Rscript (2026-10-06); the runner now finds it itself |
 | Tutorial, remade on Cosmos-shaped synthetic pulls: generator, builder, MatchIt 10:1, `prepare_phewas_inputs.py`, pheauxWAS pre and post | Built and run end to end on the Mac (2026-10-03): 328 of 350 eligible synthetic cases matched, to 2,471 controls |
 | Study design (D4–D13, D24–D26) | Decided; the case rule (D24) and index (D4) are provisional, pending the user's attending (`Attending Questions.md`) |
 | `hat_` pull | Run on the VM, 2026-10-02 (D28): `hat_Patients`, `hat_Encounters`, `hat_Diagnoses`, `hat_Labs`, as parquets there |
 | Profile queries (`tutorial/pulling-cohorts/profile_queries.sql`) | All run (2026-10-03); 7 folded into 2 |
-| `build_group_parquet.py` | Built; run on the synthetic pulls under the VM's pandas 2.2.3, pyarrow 22 and numpy 2.1.3. Not yet run on the real `hat_` pull |
-| `ctrl_` pull (`ctrl_PheWAS_intake.yaml`) | Written; passes Telescope's validator (one expected warning) and its dry run renders the intended sampling SQL. Not yet run |
+| `build_group_parquet.py` | Built; run on both real pulls on the VM (2026-10-06), writing `hat_phewas_parquets/` and `control_phewas_parquets/`. The control pull ran out of memory until diagnoses were read in chunks (design.md). The two reports haven't been reviewed here yet |
+| `ctrl_` pull (`ctrl_PheWAS_intake.yaml`) | Run on the VM (2026-10-06): 5,969 hat keys uploaded; `ctrl_Patients` 300,000, `ctrl_Encounters` 29,822,443, `ctrl_Diagnoses` 92,143,391, `ctrl_Labs` 948. About 4 hours in all |
 
 ------------------------------------------------------------------------
 
 ## Next, In Order
 
-1.  **Build the hat group on the VM**: `build_group_parquet.py` beside the `hat_` parquets; read `hat_group_report.txt` (task list).
-2.  **Run the `ctrl_` pull**, with `hat_patient_keys.parquet` beside its intake. If the pool comes back under 300,000, raise `pool_permille`.
-3.  **Build the control group** the same way.
-4.  **Match** with MatchIt on the real groups; check balance, unmatched cases, and how many cases got fewer than 10 controls.
-5.  **Run the PheWAS**: pre with a 3-year lookback, then post (D12).
+1.  **Review the two group reports** (`hat_group_report.txt`, `control_group_report.txt`): status spellings, units, who isn't eligible; then the three choices in the task list.
+2.  **Update and check the VM**: `.\phewas update`, then `.\phewas check` (Python and R packages, Rscript, files). Without pyPheWAS's packages the runner skips it and says so.
+3.  **Match on the VM** (`.\phewas match`); check balance, unmatched cases, and how many cases got fewer than 10 controls.
+4.  **Run the PheWAS**: `.\phewas pre`, then `.\phewas post` (D12).
 
 ------------------------------------------------------------------------
 
