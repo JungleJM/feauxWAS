@@ -5,7 +5,7 @@
     synthetic_cosmos/ctrl/  ctrl_Patients, ctrl_Encounters, ctrl_Diagnoses, ctrl_Labs
 
 Table and column names match the HaT pull (reference/hat_cosmos_blueprint.yaml),
-keeping only the columns adapting-cosmos/build_group_parquet.py reads plus each
+keeping only the columns study/build_group_parquet.py reads plus each
 table's keys. Dates are Cosmos DateKeys (20230517). The data are made up, with
 a few patterns planted so each step of the tutorial has something to show:
 D89.44 itself (the exposure code), earlier D89.40 codes, single-date cases,

@@ -16,4 +16,4 @@ flask-cors
 pyarrow
 
 # Install the bundled pyPheWAS package from this repository.
--e ./pyPheWAS-2a8fff1
+-e ./vendor/pyPheWAS-2a8fff1

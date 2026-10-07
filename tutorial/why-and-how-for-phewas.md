@@ -93,8 +93,8 @@ python3 "../pheauxWAS/pheauxWAS.py" \
 Run `pyPheWAS` using the local unpacked folder:
 
 ``` bash
-export PYTHONPATH="../pyPheWAS-2a8fff1"
-python3 ../pyPheWAS-2a8fff1/bin/pyPhewasPipeline \
+export PYTHONPATH="../vendor/pyPheWAS-2a8fff1"
+python3 ../vendor/pyPheWAS-2a8fff1/bin/pyPhewasPipeline \
   --phenotype icds.csv \
   --group group.csv \
   --reg_type log \
@@ -115,7 +115,7 @@ python3 "../pheauxWAS/pheauxWAS.py" \
 
 ## Real Data In The VM
 
-The tools expect delimited files, not parquet. For the HaT study, `adapting-cosmos/build_group_parquet.py` turns each Cosmos pull into a group's patient and diagnosis parquets, `matchit_example.R` matches them, and `prepare_phewas_inputs.py` writes pheauxWAS's CSVs: it drops the exposure code and keeps one time window, which pheauxWAS can't do itself. The commands, in order, are in `control-matching-tutorial.md`; what the HaT study itself chose is in `reference/plan/design.md`.
+The tools expect delimited files, not parquet. For the HaT study, `study/build_group_parquet.py` turns each Cosmos pull into a group's patient and diagnosis parquets, `matchit_example.R` matches them, and `prepare_phewas_inputs.py` writes pheauxWAS's CSVs: it drops the exposure code and keeps one time window, which pheauxWAS can't do itself. The commands, in order, are in `control-matching-tutorial.md`; what the HaT study itself chose is in `docs/plan/design.md`.
 
 `--min-code-count 2` counts distinct dates per person and phecode. The events file must therefore keep **every** diagnosis date, not one row per patient per code. A pull that deduplicates to the earliest event per code leaves everyone with a count of 1, and nobody becomes a phecode case.
 
@@ -147,8 +147,8 @@ The tools expect delimited files, not parquet. For the HaT study, `adapting-cosm
 Single-command pipeline:
 
 ``` bash
-export PYTHONPATH="pyPheWAS-2a8fff1"
-python3 pyPheWAS-2a8fff1/bin/pyPhewasPipeline \
+export PYTHONPATH="vendor/pyPheWAS-2a8fff1"
+python3 vendor/pyPheWAS-2a8fff1/bin/pyPhewasPipeline \
   --phenotype hat_icds.csv \
   --group hat_group.csv \
   --reg_type log \
@@ -164,16 +164,16 @@ python3 pyPheWAS-2a8fff1/bin/pyPhewasPipeline \
 Separate steps, if you want more inspection:
 
 ``` bash
-python3 pyPheWAS-2a8fff1/bin/pyPhewasLookup \
+python3 vendor/pyPheWAS-2a8fff1/bin/pyPhewasLookup \
   --phenotype hat_icds.csv --group hat_group.csv --reg_type log \
   --path work/pyphewas --outfile hat_fm.csv
 
-python3 pyPheWAS-2a8fff1/bin/pyPhewasModel \
+python3 vendor/pyPheWAS-2a8fff1/bin/pyPhewasModel \
   --feature_matrix hat_fm.csv --group hat_group.csv --reg_type log \
   --target hat --covariates sex+age_at_index+race+observation_years \
   --path work/pyphewas --outfile hat_regressions.csv --reg_thresh 20
 
-python3 pyPheWAS-2a8fff1/bin/pyPhewasPlot \
+python3 vendor/pyPheWAS-2a8fff1/bin/pyPhewasPlot \
   --statfile hat_regressions.csv --thresh_type fdr \
   --path work/pyphewas --outfile hat_fdr.png
 ```
@@ -181,7 +181,7 @@ python3 pyPheWAS-2a8fff1/bin/pyPhewasPlot \
 For matching controls in `pyPheWAS`, build a group file with cases and candidate controls, then run:
 
 ``` bash
-python3 pyPheWAS-2a8fff1/bin/maximizeControls \
+python3 vendor/pyPheWAS-2a8fff1/bin/maximizeControls \
   --input hat_group.csv \
   --condition hat \
   --keys "sex,age_at_index,index_year" \

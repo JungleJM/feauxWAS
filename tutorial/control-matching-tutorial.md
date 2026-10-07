@@ -1,13 +1,13 @@
 # Cases, Controls And Matching: A Walkthrough
 
-How a PheWAS of one exposure (here HaT) goes from Cosmos pulls to results, on synthetic data shaped exactly like the real pulls. Every file and column below has the name the real data has, so the same steps run on the VM. This explains the *method*; the HaT study's own choices, and why, are in `reference/plan/design.md` and `decisions.md`.
+How a PheWAS of one exposure (here HaT) goes from Cosmos pulls to results, on synthetic data shaped exactly like the real pulls. Every file and column below has the name the real data has, so the same steps run on the VM. This explains the *method*; the HaT study's own choices, and why, are in `docs/plan/design.md` and `decisions.md`. The scripts are the study's own, in `study/`; run every command from the repo root.
 
 ``` text
-make_synthetic_cosmos_parquets.py        fake pulls             synthetic_cosmos/hat/, synthetic_cosmos/ctrl/
-adapting-cosmos/build_group_parquet.py   one row per patient    hat_group.parquet, control_group.parquet (+ _diagnoses)
-matchit_example.R                        matching               work/matched_cohort.parquet
-prepare_phewas_inputs.py                 exposure code, window  work/people_matched.csv, work/diagnosis_events_<window>.csv
-pheauxWAS/pheauxWAS.py                   one model per phecode  results/hat_phewas_<window>_*
+tutorial/make_synthetic_cosmos_parquets.py   fake pulls             tutorial/synthetic_cosmos/hat/, …/ctrl/
+study/build_group_parquet.py                 one row per patient    hat_group.parquet, control_group.parquet (+ _diagnoses)
+study/matchit_example.R                      matching               tutorial/work/matched_cohort.parquet
+study/prepare_phewas_inputs.py               exposure code, window  tutorial/work/people_matched.csv, …/diagnosis_events_<window>.csv
+pheauxWAS/pheauxWAS.py                       one model per phecode  tutorial/results/hat_phewas_<window>_*
 ```
 
 Run everything from the repo root. The Python scripts need pandas and pyarrow (`uv run --with pandas --with pyarrow python ...`); the R script installs what it needs.
@@ -34,11 +34,11 @@ The real pulls take every column Cosmos offers; the synthetic ones keep only the
 ## 2. One Row Per Patient
 
 ``` bash
-python3 tutorial/adapting-cosmos/build_group_parquet.py --dir tutorial/synthetic_cosmos/hat
-python3 tutorial/adapting-cosmos/build_group_parquet.py --dir tutorial/synthetic_cosmos/ctrl
+python3 study/build_group_parquet.py --dir tutorial/synthetic_cosmos/hat
+python3 study/build_group_parquet.py --dir tutorial/synthetic_cosmos/ctrl
 ```
 
-The builder turns each pull into two files: `<group>_group.parquet`, one row per patient, and `<group>_group_diagnoses.parquet`, one row per patient, code and date. `adapting-cosmos/README.md` walks through each step. The columns that matter next:
+The builder turns each pull into two files: `<group>_group.parquet`, one row per patient, and `<group>_group_diagnoses.parquet`, one row per patient, code and date. `study/README.md` walks through each step. The columns that matter next:
 
 | Column | What it is |
 |------------------------|-----------------------------------------------|
@@ -55,7 +55,7 @@ The builder turns each pull into two files: `<group>_group.parquet`, one row per
 ## 3. Matching
 
 ``` bash
-Rscript tutorial/matchit_example.R
+Rscript study/matchit_example.R
 ```
 
 The script stacks the two group files, keeps `EligibleForMatching == 1`, and matches:
@@ -82,7 +82,7 @@ The output, `work/matched_cohort.parquet`, is the matched patients with every gr
 ## 4. Preparing The PheWAS Inputs
 
 ``` bash
-python3 tutorial/prepare_phewas_inputs.py \
+python3 study/prepare_phewas_inputs.py \
   --cohort tutorial/work/matched_cohort.parquet \
   --diagnoses tutorial/synthetic_cosmos/hat/hat_group_diagnoses.parquet \
               tutorial/synthetic_cosmos/ctrl/control_group_diagnoses.parquet \
@@ -117,13 +117,13 @@ Two caveats belong in any write-up. The matched sets are not used in the regress
 
 ## 6. All At Once: The Runner
 
-`run_phewas.py` does steps 3–5 in two commands, and also runs pyPheWAS on the same events. Each tool writes to its own folder under `runs/`. On the VM its defaults are the real files, so it needs no paths. Here, give it the synthetic ones:
+`study/run_phewas.py` does steps 3–5 in two commands (on the VM, `python phewas match` and `python phewas pre`), and also runs pyPheWAS on the same events. Each tool writes to its own folder under `runs/`. On the VM its defaults are the real files, so it needs no paths. Here, give it the synthetic ones:
 
 ``` bash
-python3 tutorial/run_phewas.py match \
+python3 study/run_phewas.py match \
   --hat tutorial/synthetic_cosmos/hat/hat_group.parquet \
   --control tutorial/synthetic_cosmos/ctrl/control_group.parquet
-python3 tutorial/run_phewas.py run --window pre --lookback-years 3 \
+python3 study/run_phewas.py pre \
   --hat-diagnoses tutorial/synthetic_cosmos/hat/hat_group_diagnoses.parquet \
   --control-diagnoses tutorial/synthetic_cosmos/ctrl/control_group_diagnoses.parquet
 ```

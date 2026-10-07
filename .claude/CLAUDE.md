@@ -4,27 +4,27 @@ A single-file PheWAS tool (`pheauxWAS/pheauxWAS.py`), the published pyPheWAS bes
 
 Read before working:
 
-- `reference/plan/design.md`: what exists, as built: the tools, the study design, the Cosmos pull, the tutorial.
-- `reference/plan/roadmap.md`: status, what is next, open problems. Check it first.
-- `reference/plan/decisions.md`: why things are the way they are (D1 onward). Read the relevant entry before reversing anything; append a new entry rather than editing an old one's reasoning.
+- `docs/plan/design.md`: what exists, as built: the tools, the study design, the Cosmos pull, the tutorial.
+- `docs/plan/roadmap.md`: status, what is next, open problems. Check it first.
+- `docs/plan/decisions.md`: why things are the way they are (D1 onward). Read the relevant entry before reversing anything; append a new entry rather than editing an old one's reasoning.
 
 ## Keeping The Docs True
 
 - A fact lives in one of those three documents only. Status lives only in the roadmap.
 - When code or the study design changes, update `design.md` in the same commit. When an item is built, delete it from the roadmap. When something is decided, add a numbered decision.
 - Nothing outside the three documents restates them: once a note's content is in them, the note is deleted, and other files point to them (D27).
-- `reference/phewasHistoryAndDecisions.md` is the exception to D27 (D39): the study told start to finish for presenting, with each phase's code, reasons and results read for a non-specialist. After a phase's results are discussed, add them there, accurate to the numbers; the plan documents stay the source of truth.
-- `reference/reports/` holds dated reports for reviewers (attending, statistician): snapshots of results at a date, not maintained afterwards; a newer report gets a new file.
-- `reference/plan/Future discussions/Attending Questions.md` holds questions for the user's attending: what the data showed, what the study does for now, and the question. Add to it when the user asks; it asks, it doesn't decide.
-- Do not add new design documents. `reference/plan/tasklist.md` is not one: it holds only what is still under discussion (D1).
-- **"Update docs"** means: bring `design.md`, `decisions.md` and `roadmap.md` up to date with the code and the task list by the rules above, move every settled task-list item into them and delete it from the task list, and delete any pasted image in `reference/plan/images/` that no document mentions.
+- `docs/phewasHistoryAndDecisions.md` is the exception to D27 (D39): the study told start to finish for presenting, with each phase's code, reasons and results read for a non-specialist. After a phase's results are discussed, add them there, accurate to the numbers; the plan documents stay the source of truth.
+- `docs/reports/` holds dated reports for reviewers (attending, statistician): snapshots of results at a date, not maintained afterwards; a newer report gets a new file.
+- `docs/plan/Future discussions/Attending Questions.md` holds questions for the user's attending: what the data showed, what the study does for now, and the question. Add to it when the user asks; it asks, it doesn't decide.
+- Do not add new design documents. `docs/plan/tasklist.md` is not one: it holds only what is still under discussion (D1).
+- **"Update docs"** means: bring `design.md`, `decisions.md` and `roadmap.md` up to date with the code and the task list by the rules above, move every settled task-list item into them and delete it from the task list, and delete any pasted image in `docs/plan/images/` that no document mentions.
 
 ## Planning And Doing Work
 
 The user works in this cycle; follow it for any change bigger than a small fix.
 
 0.  **A new chat** is usually started with a task-list section's heading: read that section, the plan documents above, and the code behind it, then answer under it. Before a chat ends, write anything it settled or learned that lives only in the chat into the task list (or, if agreed, the plan documents).
-1.  **Respond topic by topic, in `reference/plan/tasklist.md`.** When the user brings research, notes or ideas, read the code and data behind each topic first. Under each, in a blue box headed `**Claude: <topic>**`, say what exists today, give a recommendation, and end with "For you to decide" where the choice is theirs; follow it with an orange box headed `**Your response**`, empty. The boxes are Quarto fenced divs, written exactly so, with markdown (not HTML) inside (D22):
+1.  **Respond topic by topic, in `docs/plan/tasklist.md`.** When the user brings research, notes or ideas, read the code and data behind each topic first. Under each, in a blue box headed `**Claude: <topic>**`, say what exists today, give a recommendation, and end with "For you to decide" where the choice is theirs; follow it with an orange box headed `**Your response**`, empty. The boxes are Quarto fenced divs, written exactly so, with markdown (not HTML) inside (D22):
 
     ``` markdown
     ::: {style="border:2px solid #4a90e2; border-radius:6px; padding:8px 12px; margin:8px 0;"}
@@ -45,12 +45,18 @@ The user works in this cycle; follow it for any change bigger than a small fix.
 
 ## Layout
 
+The layout is D41's; the VM's own folder layout is unchanged by it (D35).
+
 - `pheauxWAS/pheauxWAS.py`: the PheWAS tool, Python and numpy only. `--selftest` runs its checks; `--help` documents every flag.
-- `pyPheWAS-2a8fff1/`: the published pyPheWAS at commit 2a8fff1, for cross-checking. Not ours to edit.
+- `study/`: the HaT study's pipeline, everything that runs on the VM: `build_group_parquet.py` (a pull's parquets to group files), `matchit_example.R` (matching), `prepare_phewas_inputs.py` (window, exposure codes), `run_phewas.py` with its launcher `phewas` (the `python phewas` commands), and `README.md`. `study/pulls/` holds the Telescope intakes and the profile queries.
+- `tutorial/`: the method on synthetic data, end to end (design.md, The Tutorial). It runs the scripts in `study/` on `tutorial/synthetic_cosmos/` and writes `tutorial/work/` and `tutorial/results/`.
 - `phecode/`: the phecodeX ICD-CM map and phecode definitions (Latin-1 encoded).
-- `tutorial/`: the method on synthetic data, end to end (design.md, The Tutorial); `tutorial/pulling-cohorts/` holds the HaT intake and the profile queries.
-- `reference/`: the Cosmos data dictionary (a copy; Telescope's is the source of truth, D2), the pull as run on the VM (`hat_cosmos_blueprint.yaml`), and `plan/`.
-- `bundling/make_bundle.py`: packs the repo into one file for the VM.
+- `docs/`: `plan/` (design, decisions, roadmap, task list), the presentation narrative and `reports/`.
+- `reference/`: source material: the Cosmos data dictionary (a copy; Telescope's is the source of truth, D2) and the `hat_` pull as run on the VM (`hat_cosmos_blueprint.yaml`).
+- `vendor/pyPheWAS-2a8fff1/`: the published pyPheWAS at commit 2a8fff1, for cross-checking. Not ours to edit.
+- `tools/`: `make_bundle.py` (packs files into one self-verifying file), `build_vm_bundle.py` (the VM bundle), `setup_env.py` (a local `.venv`), `sync_gitea.py` and `sync_github.py`.
+- `bundles/`: `phewas_vm_runner_bundle.py`, the current bundle for the VM.
+- `Ilarias Work/`: a colleague's save folder. Leave it where it is and do not edit it.
 
 ## Constraints
 
@@ -60,7 +66,7 @@ The user works in this cycle; follow it for any change bigger than a small fix.
 
 ## Commands For The VM
 
-Everything run on the VM is typed by hand. Every instruction for it, in chat and in the plan documents, is one or two words: `python phewas <command>` from the pheauxWAS folder (D36, D37). A step that needs more is added as a command to `tutorial/run_phewas.py` (the extensionless `phewas` beside it runs it), with its paths as defaults; never hand over a long command, a long path or a full PACK_ID to type. Every step ends in a one-sheet: the command prints, at most one page, everything needed to judge that step and the next command, and the user pastes it back (`python phewas sheet` for the whole study, D38); a chat reply about a step is likewise at most a page. New or changed scripts reach the VM in a bundle that `python phewas update` unpacks; to compare a PACK_ID, give its first 8 characters.
+Everything run on the VM is typed by hand. Every instruction for it, in chat and in the plan documents, is one or two words: `python phewas <command>` from the pheauxWAS folder (D36, D37). A step that needs more is added as a command to `study/run_phewas.py` (the extensionless `phewas` beside it runs it), with its paths as defaults; never hand over a long command, a long path or a full PACK_ID to type. Every step ends in a one-sheet: the command prints, at most one page, everything needed to judge that step and the next command, and the user pastes it back (`python phewas sheet` for the whole study, D38); a chat reply about a step is likewise at most a page. New or changed scripts reach the VM in `bundles/phewas_vm_runner_bundle.py`, rebuilt with `python tools/build_vm_bundle.py` and unpacked there by `python phewas update`; to compare a PACK_ID, give its first 8 characters.
 
 ## Working Conventions
 
