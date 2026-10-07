@@ -214,6 +214,14 @@ Entries are grouped, numbered stably, and never renumbered. A reversed decision 
 
 ## The Cosmos Pull
 
+
+### D37. The short commands run through Python, not a .bat
+
+**Amends D36.**
+
+**Context.** On the VM, `.\phewas` failed: the `Z:` project share does not allow `.bat` files to run ("Access is denied", 2026-10-06). Python scripts run there.
+
+**Decision.** The launcher is `phewas`, a Python file with no extension beside `run_phewas.py`, so a command is `python phewas check` (or `python phewas --check`); everything else in D36 stands. `phewas.bat` is gone.
 ### D14. One window for everyone: 2018-01-01 to 2026-06-01
 
 **Decision.** `min_date_key = 20180101`, `max_date_key = 20260601` (the latest Cosmos has; moved when Cosmos is refreshed). Cases and controls share the floor: a longer lookback for either would give it more chances to collect diagnoses.

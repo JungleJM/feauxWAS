@@ -1,0 +1,6 @@
+# The VM's short commands (D36, D37). From the pheauxWAS folder:
+#     python phewas check | match | pre | post | update | vscode
+# Python runs this file although it has no extension; it hands over to run_phewas.py.
+import os, runpy, sys
+sys.argv[0] = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run_phewas.py")
+runpy.run_path(sys.argv[0], run_name="__main__")

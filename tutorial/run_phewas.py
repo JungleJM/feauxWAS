@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 r"""Match, then run the PheWAS with every tool, each into its own folder (D33-D36).
 
-On the VM, from the pheauxWAS folder, everything is one short command (D36):
+On the VM, from the pheauxWAS folder, everything is one short command (D36, D37):
 
-    .\phewas check     is everything here? Python packages, R and its packages, the files
-    .\phewas match     MatchIt -> runs\matching\ (read the balance before going on)
-    .\phewas pre       the PheWAS, 3 years before index -> runs\pre_3y\
-    .\phewas post      the PheWAS, after index -> runs\post\
-    .\phewas update    unpack the newest *bundle*.py in this folder over these scripts
-    .\phewas vscode    point VSCodium's terminal and R extension at the newest R, in every folder
+    python phewas check     is everything here? Python packages, R and its packages, the files
+    python phewas match     MatchIt -> runs\matching\ (read the balance before going on)
+    python phewas pre       the PheWAS, 3 years before index -> runs\pre_3y\
+    python phewas post      the PheWAS, after index -> runs\post\
+    python phewas update    unpack the newest *bundle*.py in this folder over these scripts
+    python phewas vscode    point VSCodium's terminal and R extension at the newest R, in every folder
 
-phewas.bat just runs this file (python run_phewas.py <command>). Each run folder holds:
+phewas (no extension) just runs this file; `python phewas --check` works too.
+Each run folder holds:
     inputs/               the windowed people and events (prepare_phewas_inputs.py)
     pheauxwas/            the study's PheWAS: phecodeX, the study's rules
     pyphewas/             pyPheWAS 2a8fff1 on the same events: Phecode 1.2, its rules
@@ -89,7 +90,7 @@ def find_rscript(given: str | None) -> str:
     if found:
         return found[-1]
     die("Rscript not found on the PATH or under Program Files\\R. Is R installed? If it is, find "
-        "Rscript.exe and run: .\\phewas match --rscript \"<its full path>\"")
+        "Rscript.exe and run: python phewas match --rscript \"<its full path>\"")
 
 
 class Log:
@@ -138,7 +139,7 @@ def match(args) -> None:
     ok = log.step("MatchIt, 10 controls per case (D7, D32)", [rscript, script, hat, control, out],
                   out / "matching_log.txt")
     if not ok:
-        die(f"matching failed; its output is in {out / 'matching_log.txt'}. Run .\\phewas check.")
+        die(f"matching failed; its output is in {out / 'matching_log.txt'}. Run python phewas check.")
     log.write(f"\nRead the balance in {out / 'matching_log.txt'} and {out / 'matchit_balance_love_plot.png'} "
               f"before running the PheWAS.\nfinished {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
@@ -334,7 +335,7 @@ def user_settings_files() -> list[Path]:
              if (Path(appdata) / app).is_dir()]
     if not found:
         die(f"neither VSCodium nor VS Code has settings under {appdata}. Open VSCodium once, then "
-            f"run .\\phewas vscode again.")
+            f"run python phewas vscode again.")
     return found
 
 
@@ -354,7 +355,7 @@ def point_at_r(path: Path, rscript: Path) -> None:
                 settings = json.loads("\n".join(l for l in text.splitlines() if not l.strip().startswith("//")))
             except json.JSONDecodeError as e:
                 die(f"{path} could not be read ({e}); nothing was changed. Fix or move it, then run "
-                    f".\\phewas vscode again.")
+                    f"python phewas vscode again.")
         stamp, n = time.strftime('%Y%m%d_%H%M%S'), 1
         backup = path.with_name(f"settings_before_phewas_{stamp}.json")
         while backup.exists():                     # never overwrite an earlier backup
@@ -420,7 +421,9 @@ def main() -> None:
     r = sub.add_parser("run", parents=[common], help="any one window, every tool")
     r.add_argument("--window", choices=["pre", "post", "all"], required=True)
     r.add_argument("--lookback-years", type=float, help="with --window pre: the years before index (study: 3)")
-    args = ap.parse_args()
+    commands = {"check", "update", "vscode", "match", "pre", "post", "run"}
+    argv = [a[2:] if a.startswith("--") and a[2:] in commands else a for a in sys.argv[1:]]
+    args = ap.parse_args(argv)
 
     if args.root is None:
         args.root = HERE if (HERE / "pheauxWAS").is_dir() else Path.cwd()

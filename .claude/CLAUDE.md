@@ -58,7 +58,7 @@ The user works in this cycle; follow it for any change bigger than a small fix.
 
 ## Commands For The VM
 
-Everything run on the VM is typed by hand. Every instruction for it, in chat and in the plan documents, is one or two words: `.\phewas <command>` from the pheauxWAS folder (D36). A step that needs more is added as a command to `tutorial/run_phewas.py` (with `phewas.bat` beside it), with its paths as defaults; never hand over a long command, a long path or a full PACK_ID to type. New or changed scripts reach the VM in a bundle that `.\phewas update` unpacks; to compare a PACK_ID, give its first 8 characters.
+Everything run on the VM is typed by hand. Every instruction for it, in chat and in the plan documents, is one or two words: `python phewas <command>` from the pheauxWAS folder (D36, D37). A step that needs more is added as a command to `tutorial/run_phewas.py` (the extensionless `phewas` beside it runs it), with its paths as defaults; never hand over a long command, a long path or a full PACK_ID to type. New or changed scripts reach the VM in a bundle that `python phewas update` unpacks; to compare a PACK_ID, give its first 8 characters.
 
 ## Working Conventions
 

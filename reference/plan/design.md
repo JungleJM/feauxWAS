@@ -74,7 +74,7 @@ Balance: standardized mean difference under 0.1 for every variable (`cobalt::lov
 
 pheauxWAS then fits, for each phecode with at least 20 cases, `phecode ~ HaT_Flag + AgeAtIndex + Sex + Race + Ethnicity + YearsBeforeIndex + ClinicVisits365Before`, as ordinary logistic regression on the matched cohort (D13). A person is a phecode case with the code on 2+ distinct dates; one-date people are excluded from that phecode.
 
-**The runner** (`tutorial/run_phewas.py`, D33–D36) runs all of this with the VM's paths as defaults; on the VM it is typed as `.\phewas <command>` (`phewas.bat` beside it):
+**The runner** (`tutorial/run_phewas.py`, D33–D37) runs all of this with the VM's paths as defaults; on the VM it is typed as `python phewas <command>` (`phewas`, an extensionless Python file beside it, runs it; `--check` works as well as `check`):
 
 | Command | Does |
 |---|---|
