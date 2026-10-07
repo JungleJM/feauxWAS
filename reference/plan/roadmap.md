@@ -25,7 +25,7 @@ When an item here is built, delete it from this file and describe the result in 
 
 1.  **Review the two group reports** (`hat_group_report.txt`, `control_group_report.txt`): status spellings, units, who isn't eligible; then the three choices in the task list.
 2.  **Update and check the VM**: `python phewas update`, then `python phewas check` (Python and R packages, Rscript, files). Without pyPheWAS's packages the runner skips it and says so.
-3.  **Match on the VM** (`python phewas match`); check balance, unmatched cases, and how many cases got fewer than 10 controls.
+3.  **Match on the VM** (`python phewas match`, run 2026-10-07), then judge it from `python phewas sheet`: balance, unmatched cases, and how many cases got fewer than 10 controls.
 4.  **Run the PheWAS**: `python phewas pre`, then `python phewas post` (D12).
 
 ------------------------------------------------------------------------

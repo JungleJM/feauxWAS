@@ -222,6 +222,12 @@ Entries are grouped, numbered stably, and never renumbered. A reversed decision 
 **Context.** On the VM, `.\phewas` failed: the `Z:` project share does not allow `.bat` files to run ("Access is denied", 2026-10-06). Python scripts run there.
 
 **Decision.** The launcher is `phewas`, a Python file with no extension beside `run_phewas.py`, so a command is `python phewas check` (or `python phewas --check`); everything else in D36 stands. `phewas.bat` is gone.
+
+### D38. Every step ends in a one-sheet
+
+**Context.** The matching log was long and hard to read off the VM (2026-10-07). The user asked that every step give, in at most a page, what is needed to judge it and move on, to copy into the chat.
+
+**Decision.** `python phewas sheet` writes `runs/sheet.txt`: the groups (size, eligible, why not), the match (largest standardized mean difference and any over 0.1, unmatched cases and their quarters, controls per case), each PheWAS run (inputs, phecodes tested and significant, the top eight with OR, interval, q and cases, and whether pyPheWAS and the Phecode 1.2 bridge agree), and the next command. `match`, `pre` and `post` print it when they finish. `python phewas balance` gives the match alone with every variable's standardized mean difference, computed as MatchIt's `summary()` does.
 ### D14. One window for everyone: 2018-01-01 to 2026-06-01
 
 **Decision.** `min_date_key = 20180101`, `max_date_key = 20260601` (the latest Cosmos has; moved when Cosmos is refreshed). Cases and controls share the floor: a longer lookback for either would give it more chances to collect diagnoses.

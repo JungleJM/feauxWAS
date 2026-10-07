@@ -74,12 +74,14 @@ Balance: standardized mean difference under 0.1 for every variable (`cobalt::lov
 
 pheauxWAS then fits, for each phecode with at least 20 cases, `phecode ~ HaT_Flag + AgeAtIndex + Sex + Race + Ethnicity + YearsBeforeIndex + ClinicVisits365Before`, as ordinary logistic regression on the matched cohort (D13). A person is a phecode case with the code on 2+ distinct dates; one-date people are excluded from that phecode.
 
-**The runner** (`tutorial/run_phewas.py`, D33–D37) runs all of this with the VM's paths as defaults; on the VM it is typed as `python phewas <command>` (`phewas`, an extensionless Python file beside it, runs it; `--check` works as well as `check`):
+**The runner** (`tutorial/run_phewas.py`, D33–D38) runs all of this with the VM's paths as defaults; on the VM it is typed as `python phewas <command>` (`phewas`, an extensionless Python file beside it, runs it; `--check` works as well as `check`):
 
 | Command | Does |
 |---|---|
 | `check` | lists what is present and missing: Python packages, Rscript and MatchIt, arrow, cobalt, dplyr, the files |
 | `match` | MatchIt into `runs/matching/` |
+| `balance` | the match on a page: every variable's standardized mean difference (as MatchIt's `summary()` computes it), unmatched cases by quarter, controls per case; also `runs/matching/balance.txt` |
+| `sheet` | one page on the whole study and the next command, in `runs/sheet.txt`; `match`, `pre` and `post` print it when they finish (D38) |
 | `pre` | the 3 years before index into `runs/pre_3y/` (`run --window pre --lookback-years 3`) |
 | `post` | after index into `runs/post/` |
 | `update` | unpacks the newest `*bundle*.py` in the folder over the scripts |

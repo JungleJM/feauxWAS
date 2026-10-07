@@ -4,7 +4,9 @@ r"""Match, then run the PheWAS with every tool, each into its own folder (D33-D3
 On the VM, from the pheauxWAS folder, everything is one short command (D36, D37):
 
     python phewas check     is everything here? Python packages, R and its packages, the files
-    python phewas match     MatchIt -> runs\matching\ (read the balance before going on)
+    python phewas match     MatchIt -> runs\matching\
+    python phewas balance   what to judge in the match: SMDs over 0.1, unmatched cases, controls per case
+    python phewas sheet     one page: where the study stands and the next step (match, pre, post print it too)
     python phewas pre       the PheWAS, 3 years before index -> runs\pre_3y\
     python phewas post      the PheWAS, after index -> runs\post\
     python phewas update    unpack the newest *bundle*.py in this folder over these scripts
@@ -140,8 +142,9 @@ def match(args) -> None:
                   out / "matching_log.txt")
     if not ok:
         die(f"matching failed; its output is in {out / 'matching_log.txt'}. Run python phewas check.")
-    log.write(f"\nRead the balance in {out / 'matching_log.txt'} and {out / 'matchit_balance_love_plot.png'} "
-              f"before running the PheWAS.\nfinished {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    log.write(f"\nfinished {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+    if args.out is None:
+        sheet(args)
 
 
 def pyphewas_inputs(inputs: Path, events_name: str, folder: Path) -> None:
@@ -275,6 +278,9 @@ def run(args) -> None:
     log.write(f"\nfinished {time.strftime('%Y-%m-%d %H:%M:%S')}: "
               + (f"FAILED or skipped: {', '.join(failed)}" if failed else "every step done")
               + f"\n  {run_dir}")
+    print()
+    if args.runs is None:
+        sheet(args)
     if failed:
         sys.exit(1)
 
@@ -324,6 +330,161 @@ def update(args) -> None:
     if subprocess.run([sys.executable, b, "info"]).returncode:
         die(f"{b.name} failed its own integrity check; nothing was unpacked.")
     sys.exit(subprocess.run([sys.executable, b, "unpack", args.root, "--force"]).returncode)
+
+
+def match_facts(root: Path, cohort: Path | None = None) -> dict:
+    """What to judge in the match, from the files match wrote."""
+    import numpy as np
+    import pandas as pd
+    matched = pd.read_parquet(need(cohort or root / "runs" / "matching" / "matched_cohort.parquet",
+                                   "matched cohort (run match first)"))
+    hat = pd.read_parquet(need(root / "hat_phewas_parquets" / "hat_group.parquet", "hat group file"))
+    eligible = hat[hat["EligibleForMatching"] == 1]
+
+    # Standardized mean differences as MatchIt's summary() computes them: treated mean
+    # minus weighted control mean, over the treated SD among all eligible cases.
+    def columns(df: pd.DataFrame) -> pd.DataFrame:
+        x = pd.DataFrame({c: pd.to_numeric(df[c], errors="coerce")
+                          for c in ["AgeAtIndex", "YearsBeforeIndex", "YearsAfterIndex"]})
+        x["log1p(ClinicVisits365Before)"] = np.log1p(pd.to_numeric(df["ClinicVisits365Before"], errors="coerce"))
+        for c in ["Race", "Ethnicity", "Sex"]:
+            for level in sorted(pd.concat([matched[c], eligible[c]]).dropna().astype(str).unique()):
+                x[f"{c} {level}"] = (df[c].astype(str) == level).astype(float)
+        return x
+    xt_all, xm = columns(eligible), columns(matched)
+    t = matched["HaT_Flag"].astype(int) == 1
+    w = pd.to_numeric(matched["weights"], errors="coerce")
+    rows = []
+    for c in xm.columns:
+        binary = set(xt_all[c].dropna().unique()) <= {0.0, 1.0}
+        p = xt_all[c].mean()
+        sd = np.sqrt(p * (1 - p)) if binary else xt_all[c].std()
+        mt = xm.loc[t, c].mean()
+        mc = np.average(xm.loc[~t, c], weights=w[~t]) if (~t).any() else np.nan
+        rows.append((c, mt, mc, (mt - mc) / sd if sd > 0 else 0.0))
+    smd = pd.DataFrame(rows, columns=["variable", "HaT mean", "control mean", "SMD"])
+    gone = eligible[~eligible["PatientDurableKey"].isin(matched.loc[t, "PatientDurableKey"])]
+    per = matched[~t].groupby("subclass", observed=True).size().reindex(
+        matched.loc[t, "subclass"].unique(), fill_value=0)
+    return {"smd": smd, "over": smd[smd["SMD"].abs() > 0.1], "eligible": len(eligible), "gone": gone,
+            "cases": int(t.sum()), "controls": int((~t).sum()), "per": per}
+
+
+def match_lines(f: dict, detail: bool) -> list[str]:
+    smd, over, per, gone = f["smd"], f["over"], f["per"], f["gone"]
+    big = smd.loc[smd["SMD"].abs().idxmax()]
+    lines = [f"MATCHING: {f['cases']:,} of {f['eligible']:,} eligible cases matched to {f['controls']:,} controls",
+             f"  balance: largest SMD {big['variable']} {abs(big['SMD']):.3f} -> "
+             + ("all under 0.1, OK" if over.empty else f"{len(over)} OVER 0.1: "
+                + ", ".join(f"{r['variable']} {r['SMD']:+.2f}" for _, r in over.iterrows()))]
+    by_q = gone["IndexQuarter"].astype(str).value_counts().head(3) if len(gone) else None
+    lines.append(f"  unmatched cases: {len(gone):,} ({len(gone) / max(f['eligible'], 1):.1%})"
+                 + (", most in " + ", ".join(f"{q} ({n})" for q, n in by_q.items()) if by_q is not None else ""))
+    counts = per.value_counts().sort_index(ascending=False)
+    lines.append(f"  controls per case (asked 10): mean {per.mean():.1f}; "
+                 + "  ".join(f"{k}:{n}" for k, n in counts.items()) + "  (controls:cases)")
+    if detail:
+        lines.append("  every variable's SMD (should be under 0.1; sex and quarter are exact):")
+        lines += [f"    {r['variable']:<45} {r['SMD']:+.3f}" for _, r in smd.iterrows()]
+    return lines
+
+
+def balance(args) -> None:
+    """After match: SMDs, unmatched cases and controls per case, one sheet."""
+    lines = match_lines(match_facts(args.root, args.cohort), detail=True)
+    text = "\n".join(lines)
+    print(text)
+    (args.root / "runs" / "matching" / "balance.txt").write_text(text + "\n", encoding="utf-8")
+
+
+def group_lines(root: Path) -> list[str]:
+    import pandas as pd
+    lines = ["GROUPS"]
+    for name, rel in [("hat", "hat_phewas_parquets/hat_group.parquet"),
+                      ("control", "control_phewas_parquets/control_group.parquet")]:
+        path = root / rel
+        if not path.exists():
+            lines.append(f"  {name}: MISSING {rel}")
+            continue
+        g = pd.read_parquet(path, columns=["EligibleForMatching", "ClinicVisits365Before", "Sex",
+                                           "IndexBeforeD8944Existed"])
+        lines.append(f"  {name}: {len(g):,} patients, {int(g['EligibleForMatching'].sum()):,} eligible; not: "
+                     f"{int((g['ClinicVisits365Before'] < 2).sum()):,} under 2 clinic visits, "
+                     f"{int(g['Sex'].isna().sum()):,} no sex, "
+                     f"{int(g['IndexBeforeD8944Existed'].sum()):,} indexed before 2021-10")
+    return lines
+
+
+def run_lines(run_dir: Path) -> list[str]:
+    """One run folder: what each tool found."""
+    import pandas as pd
+    name = run_dir.name
+    lines = [f"PHEWAS {name}" + ("" if finished(run_dir) else "  (UNFINISHED: see its run_log.txt)")]
+    log = (run_dir / "inputs" / "console.txt")
+    if log.exists():
+        kept = [l.strip() for l in log.read_text(errors="replace").splitlines() if "rows kept in window" in l]
+        people = [l.split()[1] for l in log.read_text(errors="replace").splitlines() if l.startswith("people:")]
+        if kept:
+            lines.append(f"  inputs: {people[0] if people else '?'} people, {kept[0].split(' rows')[0]} diagnoses in window")
+    res = run_dir / "pheauxwas" / f"hat_phewas_{name}_results.csv"
+    if res.exists():
+        r = pd.read_csv(res)
+        tested = r[r["p"].notna()]
+        bon = tested[tested["bonferroni"].astype(str).str.upper() == "TRUE"]
+        lines.append(f"  pheauxWAS (phecodeX): {len(tested):,} phecodes tested, {len(bon):,} Bonferroni-significant, "
+                     f"{int((tested['q_fdr'] < 0.05).sum()):,} FDR<0.05; {int((tested['model'] == 'firth').sum()):,} by Firth")
+        for _, x in tested.sort_values("p").head(8).iterrows():
+            lines.append(f"    {x['phecode']:<10} {str(x['description'])[:38]:<38} OR {x['OR']:>7.3g} "
+                         f"[{x['OR_lower95']:.3g}-{x['OR_upper95']:.3g}]  q {x['q_fdr']:.2g}  cases {int(x['n_cases']):,}"
+                         + ("  (Firth)" if x["model"] == "firth" else ""))
+    else:
+        lines.append("  pheauxWAS: no results")
+    comp = next(iter((run_dir / "comparison").glob("*_summary.txt")), None) if (run_dir / "comparison").exists() else None
+    if comp:
+        keep = [" ".join(l.split()) for l in comp.read_text(errors="replace").splitlines()
+                if l.strip().startswith(("phecodes in both", "beta:", "same direction"))]
+        lines.append("  pyPheWAS vs pheauxWAS on Phecode 1.2 (should agree): " + "; ".join(keep))
+    elif (run_dir / "pyphewas").exists():
+        lines.append("  pyPheWAS: no comparison (see run_log.txt)")
+    else:
+        lines.append("  pyPheWAS: skipped")
+    return lines
+
+
+def sheet(args) -> None:
+    """One page: everything needed to judge where the study stands, and the next step."""
+    root, lines = args.root, [f"pheauxWAS one-sheet, {time.strftime('%Y-%m-%d %H:%M')}", ""]
+    lines += group_lines(root) + [""]
+    runs = root / "runs"
+    matched = (runs / "matching" / "matched_cohort.parquet").exists()
+    f = None
+    if matched:
+        f = match_facts(root)
+        lines += match_lines(f, detail=False) + [""]
+    else:
+        lines += ["MATCHING: not run yet", ""]
+    run_dirs = sorted(d for d in runs.glob("*") if (d / "inputs").is_dir()
+                      and "_unfinished_" not in d.name) if runs.exists() else []
+    for d in run_dirs:
+        lines += run_lines(d) + [""]
+    names = {d.name for d in run_dirs if finished(d)}
+    if any("MISSING" in l for l in lines[:6]):
+        nxt = "build the missing group files (build_group_parquet.py), then python phewas match"
+    elif not matched:
+        nxt = "python phewas match"
+    elif not f["over"].empty or len(f["gone"]) > 0.1 * f["eligible"]:
+        nxt = "send this sheet: balance or unmatched cases need a decision before the PheWAS"
+    elif "pre_3y" not in names:
+        nxt = "python phewas pre"
+    elif "post" not in names:
+        nxt = "python phewas post"
+    else:
+        nxt = "send this sheet: results ready to review"
+    lines += [f"NEXT: {nxt}", "Copy this whole sheet into the chat."]
+    text = "\n".join(lines)
+    print(text)
+    runs.mkdir(exist_ok=True)
+    (runs / "sheet.txt").write_text(text + "\n", encoding="utf-8")
 
 
 def user_settings_files() -> list[Path]:
@@ -396,6 +557,9 @@ def main() -> None:
     sub.add_parser("check", help="is everything here?").add_argument(
         "--rscript", help="the Rscript program, if not found by itself")
     sub.add_parser("update", help="unpack the newest *bundle*.py here")
+    sub.add_parser("sheet", help="one page: where the study stands and the next step")
+    sub.add_parser("balance", help="after match: SMDs over 0.1, unmatched cases, controls per case").add_argument(
+        "--cohort", type=Path, help="default: runs/matching/matched_cohort.parquet")
     sub.add_parser("vscode", help="point VSCodium's terminal and R extension at the newest R").add_argument(
         "--rscript", help="the Rscript program, if not found by itself")
 
@@ -421,7 +585,7 @@ def main() -> None:
     r = sub.add_parser("run", parents=[common], help="any one window, every tool")
     r.add_argument("--window", choices=["pre", "post", "all"], required=True)
     r.add_argument("--lookback-years", type=float, help="with --window pre: the years before index (study: 3)")
-    commands = {"check", "update", "vscode", "match", "pre", "post", "run"}
+    commands = {"check", "update", "vscode", "match", "balance", "sheet", "pre", "post", "run"}
     argv = [a[2:] if a.startswith("--") and a[2:] in commands else a for a in sys.argv[1:]]
     args = ap.parse_args(argv)
 
@@ -432,7 +596,8 @@ def main() -> None:
         args.command, args.window, args.lookback_years = "run", "pre", 3.0
     elif args.command == "post":
         args.command, args.window, args.lookback_years = "run", "post", None
-    {"check": check, "update": update, "vscode": vscode, "match": match, "run": run}[args.command](args)
+    {"check": check, "update": update, "vscode": vscode, "match": match, "balance": balance, "sheet": sheet,
+     "run": run}[args.command](args)
 
 
 if __name__ == "__main__":
