@@ -10,7 +10,7 @@ pheauxWAS is a single-script PheWAS tool in Python. This repo holds it, the HaT 
 | `study/` | The HaT study's pipeline, everything that runs on the VM: group building, matching, the runner (`python phewas ...`); `study/pulls/` has the Telescope intakes |
 | `tutorial/` | The method end to end on synthetic data, using the scripts in `study/` |
 | `phecode/` | phecodeX maps and definitions |
-| `docs/` | `plan/` (design, decisions, roadmap, task list), the study narrative, `reports/` for reviewers |
+| `docs/` | `plan/` (design, decisions, roadmap, task list), the study narrative, `reports/` for reviewers, `gitissues.md` (git problems on the VM and their fixes) |
 | `reference/` | Source material: the Cosmos data dictionary copy and the `hat_` pull as run |
 | `vendor/pyPheWAS-2a8fff1/` | The published pyPheWAS, unedited |
 | `tools/` | Bundling, environment setup, remote syncing |
