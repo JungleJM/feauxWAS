@@ -21,7 +21,7 @@ python3 tutorial/make_synthetic_cosmos_parquets.py
 Each group is one Telescope pull of four tables, joined by `PatientDurableKey`:
 
 | Table | One row per | Used for |
-|------------------|------------------|------------------------------|
+|--------------------|--------------------|--------------------------------|
 | `hat_Patients` / `ctrl_Patients` | patient | `IndexDate` (a DateKey like `20230517`), `AgeAtIndex`, `Sex`, `ReliableSex`, `FirstRace`, `MultiRacial`, `Ethnicity`, `BirthDate`, `DeathDate` |
 | `hat_Encounters` / `ctrl_Encounters` | encounter | `DateKey`, `DerivedEncounterStatus`, `DerivedEncounterType_X`, `IsEdVisit`, `IsHospitalAdmission` |
 | `hat_Diagnoses` / `ctrl_Diagnoses` | diagnosis event | `DiagnosisDate`, `DiagnosisCode`, `Vocabulary`, `DiagnosisStatus` |
@@ -41,7 +41,7 @@ python3 tutorial/adapting-cosmos/build_group_parquet.py --dir tutorial/synthetic
 The builder turns each pull into two files: `<group>_group.parquet`, one row per patient, and `<group>_group_diagnoses.parquet`, one row per patient, code and date. `adapting-cosmos/README.md` walks through each step. The columns that matter next:
 
 | Column | What it is |
-|------------------|------------------------------------|
+|------------------------|-----------------------------------------------|
 | `HaT_Flag` | 1 for the hat group, 0 for controls |
 | `IndexDate`, `IndexQuarter` | the index date, and its calendar quarter (`2023Q2`) |
 | `AgeAtIndex`, `Sex`, `Race`, `Ethnicity` | demographics; unknown values grouped as `Unknown` |
