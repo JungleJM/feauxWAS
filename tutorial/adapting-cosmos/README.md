@@ -3,7 +3,7 @@
 From the two Telescope pulls to `hat_group.parquet` and `control_group.parquet`, the files matching and the PheWAS run on. Everything here runs on the VM; the study's choices it applies are in `reference/plan/decisions.md` (the D-numbers below).
 
 | File | What it is |
-|------------------------|-----------------------------------------------|
+|-------------------------|-----------------------------------------------|
 | `build_group_parquet.py` | Turns one pull's four parquets into the group's two files. Needs pandas and pyarrow only. |
 | `ctrl_PheWAS_intake.yaml` | The control pull, as a Telescope intake. |
 
@@ -34,7 +34,7 @@ To run the script on parquets in another folder: `python build_group_parquet.py 
 `<group>_group.parquet`, one row per patient:
 
 | Column | Meaning |
-|------------------------|-----------------------------------------------|
+|-------------------------|-----------------------------------------------|
 | `PatientDurableKey` | the patient |
 | `Group`, `HaT_Flag` | `hat` (1) or `control` (0) |
 | `IndexDate`, `IndexYear`, `IndexQuarter` | the index date; its year; its quarter, as `2023Q2` |
