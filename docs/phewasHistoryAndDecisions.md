@@ -15,12 +15,12 @@ A PheWAS (phenome-wide association study) tests every diagnosis group (a *phecod
 ## 2. The Pipeline at a Glance
 
 | Phase | What happens | Code | Output |
-|---|---|---|---|
-| 1. HaT cohort | Pull every patient with a HaT diagnosis from Epic Cosmos | Telescope intake (`HaT_PheWAS_intake.yaml`), run on the VM | `hat_Patients`, `hat_Encounters`, `hat_Diagnoses`, `hat_Labs` |
-| 2. Control pool | Pull a random pool of 300,000 patients without HaT | Telescope intake (`ctrl_PheWAS_intake.yaml`) | `ctrl_` tables, same shape |
-| 3. Group files | Turn each pull into one row per patient, plus a clean diagnosis list | `build_group_parquet.py` | `hat_group.parquet`, `control_group.parquet` (+ `_diagnoses`) |
-| 4. Matching | Choose up to 10 similar controls per HaT patient | `python phewas match` → `matchit_example.R` (R package MatchIt) | `runs/matching/matched_cohort.parquet` |
-| 5. PheWAS | Test every phecode: HaT vs matched controls | `python phewas pre` / `post` → `prepare_phewas_inputs.py`, `pheauxWAS.py`, pyPheWAS | `runs/pre_3y/`, `runs/post/` |
+|------------------|------------------|------------------|------------------|
+| 1\. HaT cohort | Pull every patient with a HaT diagnosis from Epic Cosmos | Telescope intake (`HaT_PheWAS_intake.yaml`), run on the VM | `hat_Patients`, `hat_Encounters`, `hat_Diagnoses`, `hat_Labs` |
+| 2\. Control pool | Pull a random pool of 300,000 patients without HaT | Telescope intake (`ctrl_PheWAS_intake.yaml`) | `ctrl_` tables, same shape |
+| 3\. Group files | Turn each pull into one row per patient, plus a clean diagnosis list | `build_group_parquet.py` | `hat_group.parquet`, `control_group.parquet` (+ `_diagnoses`) |
+| 4\. Matching | Choose up to 10 similar controls per HaT patient | `python phewas match` → `matchit_example.R` (R package MatchIt) | `runs/matching/matched_cohort.parquet` |
+| 5\. PheWAS | Test every phecode: HaT vs matched controls | `python phewas pre` / `post` → `prepare_phewas_inputs.py`, `pheauxWAS.py`, pyPheWAS | `runs/pre_3y/`, `runs/post/` |
 
 Patient data never leaves the VM; all code is developed and tested on synthetic data shaped exactly like the real pulls. In the repository the pulls are in `study/pulls/` and every script above is in `study/` (`pheauxWAS.py` in `pheauxWAS/`); on the VM they sit in the pheauxWAS folder.
 
@@ -31,7 +31,7 @@ Patient data never leaves the VM; all code is developed and tested on synthetic 
 ### Who is a case, and when their "clock" starts
 
 | Rule | Choice | Why |
-|---|---|---|
+|------------------------|------------------------|------------------------|
 | Case definition | D89.44 (the ICD-10-CM code for HaT) on **at least one date** (D24) | HaT is diagnosed by genetic testing, so one code is likely reliable. The common PheWAS "2+ dates" rule guards against rule-out codes in common conditions. 2+ dates is kept as a sensitivity analysis. |
 | Index date | The **first** D89.44 that is not a ruled-out or error entry (D4) | The point at which HaT is known. Diagnoses are then split into "before" and "after" this date. |
 | Codes used | ICD-10-CM only (D15) | The phecode map covers ICD-10-CM, and D89.44 is a CM code. |
@@ -42,7 +42,7 @@ D89.40–D89.49 (other mast-cell codes) do **not** define a case or the index: t
 ### The variables, and why each one
 
 | Variable | Definition | Why it is needed |
-|---|---|---|
+|------------------------|------------------------|------------------------|
 | `AgeAtIndex` | Age at the index date | Age drives nearly every diagnosis. |
 | `Sex` | Cosmos `ReliableSex`; its `Sex` when that is Ambiguous (D25) | Sex-specific diagnoses; exact matching needs Male or Female. |
 | `Race`, `Ethnicity` | Unknown, blank and refused values grouped as `Unknown`, not dropped (D10) | Dropping unknowns can remove cases and controls unevenly. |
@@ -55,23 +55,23 @@ D89.40–D89.49 (other mast-cell codes) do **not** define a case or the index: t
 
 ### What the code does (`build_group_parquet.py`)
 
-1. `read()` / `read_diagnoses()`: read only the needed columns; diagnoses are read in chunks of a few million rows (the control file has 92 million).
-2. Drop diagnoses whose status contains "rule", "error", "delete" or "cancel"; collapse to one row per patient, code and date.
-3. Index: the first surviving D89.44 (cases). Age is shifted by the years the index moved, if the status filter moved it.
-4. Demographics as in the table above.
-5. Observation time from completed encounters; `count_days()` counts clinic-visit days in [index − 365, index), so **the index day itself is not counted**.
-6. Earlier mast-cell codes and tryptase are recorded for describing the cases.
-7. **Eligible for matching** if: ≥ 2 clinic-visit days in the year before index (D8), a usable sex, and (cases) an index on or after 2021-10-01, when the control pool begins (D30).
+1.  `read()` / `read_diagnoses()`: read only the needed columns; diagnoses are read in chunks of a few million rows (the control file has 92 million).
+2.  Drop diagnoses whose status contains "rule", "error", "delete" or "cancel"; collapse to one row per patient, code and date.
+3.  Index: the first surviving D89.44 (cases). Age is shifted by the years the index moved, if the status filter moved it.
+4.  Demographics as in the table above.
+5.  Observation time from completed encounters; `count_days()` counts clinic-visit days in \[index − 365, index), so **the index day itself is not counted**.
+6.  Earlier mast-cell codes and tryptase are recorded for describing the cases.
+7.  **Eligible for matching** if: ≥ 2 clinic-visit days in the year before index (D8), a usable sex, and (cases) an index on or after 2021-10-01, when the control pool begins (D30).
 
 ### Result
 
-| | HaT |
-|---|---|
+|   | HaT |
+|----|----|
 | Patients with any D89.44 | **5,969** |
 | Eligible for matching | **4,144** (69%) |
 | Not eligible: under 2 clinic visits in the prior year | 1,753 |
 | Not eligible: index before 2021-10-01 | 119 |
-| Not eligible: no usable sex | <11 (masked: Cosmos small-cell rule) |
+| Not eligible: no usable sex | \<11 (masked: Cosmos small-cell rule) |
 
 (Reasons overlap, so they sum to more than the 1,825 not eligible.)
 
@@ -88,11 +88,11 @@ A control is a patient with **no D89.44 on any date** (D5): "no known HaT", not 
 Controls have no diagnosis to anchor an index on, so each gets a **pseudo-index**: one randomly chosen completed clinic visit (Office Visit or Follow-Up) between 2021-10-01 and 2026-06-01 (D6, D30, D31). Their age, prior visits and "before/after" windows are all measured from that date, exactly as for cases.
 
 | Choice | Why |
-|---|---|
+|------------------------------------|------------------------------------|
 | Anchor on a random clinic visit | Controls should resemble cases in their *chance to be observed*, not in their diagnoses. |
 | *Rejected:* controls chosen for a new diagnosis, or for nearby (GI, immune) diagnoses (D6) | That selects on outcomes and biases every comparison. |
-| Pool of 300,000 (~50 per case) | Enough to find 10 close matches per case even in the busiest quarters (up to 486 cases in one quarter). |
-| Random, reproducible sample | A hash of the patient key keeps ~1% of Cosmos, then the first 300,000 in hash order (D30). |
+| Pool of 300,000 (\~50 per case) | Enough to find 10 close matches per case even in the busiest quarters (up to 486 cases in one quarter). |
+| Random, reproducible sample | A hash of the patient key keeps \~1% of Cosmos, then the first 300,000 in hash order (D30). |
 | HaT patients excluded | Their keys were uploaded and excluded in SQL; the builder also drops any control found to have a D89.44. |
 | Same tables and columns as the HaT pull | Both groups go through identical code. |
 
@@ -100,12 +100,12 @@ Controls have no diagnosis to anchor an index on, so each gets a **pseudo-index*
 
 Pull (2026-10-06, about 4 hours): 300,000 patients, 29,822,443 encounters, 92,143,391 diagnosis rows, 948 tryptase results.
 
-| | Controls |
-|---|---|
-| Patients | **300,000** |
-| Eligible for matching | **127,223** (42%) |
-| Not eligible: under 2 clinic visits in the prior year | 172,748 |
-| Not eligible: no usable sex | 110 |
+|                                                       | Controls          |
+|-----------------------------------------------------|-------------------|
+| Patients                                              | **300,000**       |
+| Eligible for matching                                 | **127,223** (42%) |
+| Not eligible: under 2 clinic visits in the prior year | 172,748           |
+| Not eligible: no usable sex                           | 110               |
 
 **How to read it.** Most random clinic visits belong to people who rarely visit, so 58% of the pool fails the same utilization rule applied to cases. That is expected and harmless: 127,223 eligible controls is still about 31 per eligible case.
 
@@ -115,12 +115,12 @@ Pull (2026-10-06, about 4 hours): 300,000 patients, 29,822,443 encounters, 92,14
 
 MatchIt (an R package) picks, for each case, controls who look like it on chosen characteristics.
 
-1. **Propensity score.** A logistic regression predicts "is this patient a case?" from the matching variables. Each patient's predicted probability is their propensity score: one number summarizing how case-like they are.
-2. **Nearest neighbour.** Each case is paired with the controls whose scores are closest.
-3. **Exact variables.** Some variables must match exactly (a control must share the case's value).
-4. **Caliper.** A control further than a set distance from the case's score is never used, even if that leaves the case with fewer controls.
-5. **Ratio and replacement.** Up to *k* controls per case; without replacement, each control is used once.
-6. **Output.** The matched patients, a `subclass` (which matched set each belongs to) and a `weight` (controls in sets with fewer controls weigh more, so each set counts equally).
+1.  **Propensity score.** A logistic regression predicts "is this patient a case?" from the matching variables. Each patient's predicted probability is their propensity score: one number summarizing how case-like they are.
+2.  **Nearest neighbour.** Each case is paired with the controls whose scores are closest.
+3.  **Exact variables.** Some variables must match exactly (a control must share the case's value).
+4.  **Caliper.** A control further than a set distance from the case's score is never used, even if that leaves the case with fewer controls.
+5.  **Ratio and replacement.** Up to *k* controls per case; without replacement, each control is used once.
+6.  **Output.** The matched patients, a `subclass` (which matched set each belongs to) and a `weight` (controls in sets with fewer controls weigh more, so each set counts equally).
 
 The test of success is **balance**: after matching, the two groups' averages should be close on every variable. It is measured by the **standardized mean difference (SMD)**: the difference in means divided by the cases' standard deviation. An SMD under 0.1 is the conventional threshold for negligible imbalance.
 
@@ -138,7 +138,7 @@ matchit(HaT_Flag ~ AgeAtIndex + YearsBeforeIndex + YearsAfterIndex +
 ```
 
 | Element | Choice | Reason |
-|---|---|---|
+|------------------------|------------------------|------------------------|
 | Who is matched | Only patients with `EligibleForMatching = 1` | Same entry rules for both groups (Phase 1, step 7). |
 | Propensity variables | Age; years of record before and after index; clinic visits; race; ethnicity | The main drivers of how many diagnoses a patient accumulates, other than HaT itself. |
 | `log1p(ClinicVisits365Before)` | log(1 + visits) | Visit counts are highly skewed; the log stops a few very heavy users from dominating the score. |
@@ -154,7 +154,7 @@ matchit(HaT_Flag ~ AgeAtIndex + YearsBeforeIndex + YearsAfterIndex +
 **How the match is judged** (the rules behind "good", "borderline" or "bad"):
 
 | Check | Good | Why this threshold |
-|---|---|---|
+|------------------------|------------------------|------------------------|
 | SMD of every variable | under 0.1 | The conventional threshold for negligible imbalance in matched studies. |
 | Unmatched cases | under about 10%, and not concentrated in one kind of patient | A working rule for this study, not a published standard: more loss starts to change who the cases represent. |
 | Controls per case | reported; no fixed threshold | Fewer controls means less power, not bias. |
@@ -163,12 +163,12 @@ matchit(HaT_Flag ~ AgeAtIndex + YearsBeforeIndex + YearsAfterIndex +
 
 ## 7. Matching Results
 
-| | Controls | Cases (HaT) |
-|---|---|---|
-| Eligible (entered matching) | 127,223 | 4,144 |
-| Matched | **28,670** | **3,911** |
-| Unmatched | 98,553 | 233 |
-| Effective sample size (ESS) | 16,401.65 | 3,911 |
+|                             | Controls   | Cases (HaT) |
+|-----------------------------|------------|-------------|
+| Eligible (entered matching) | 127,223    | 4,144       |
+| Matched                     | **28,670** | **3,911**   |
+| Unmatched                   | 98,553     | 233         |
+| Effective sample size (ESS) | 16,401.65  | 3,911       |
 
 ### Balance: good, with one borderline variable
 
@@ -185,9 +185,9 @@ Every variable's SMD is under 0.1 except **YearsAfterIndex, at 0.102**. Sex and 
 
 ### Controls per case: as expected
 
-| Controls | 10 | 9 | 8 | 7 | 6 | 5 | 4 | 3 | 2 | 1 |
-|---|---|---|---|---|---|---|---|---|---|---|
-| Cases | 2,210 | 62 | 128 | 108 | 110 | 183 | 266 | 247 | 255 | 342 |
+| Controls | 10    | 9   | 8   | 7   | 6   | 5   | 4   | 3   | 2   | 1   |
+|----------|-------|-----|-----|-----|-----|-----|-----|-----|-----|-----|
+| Cases    | 2,210 | 62  | 128 | 108 | 110 | 183 | 266 | 247 | 255 | 342 |
 
 Mean 7.3 controls per matched case; 57% of cases got all 10. Cases with fewer controls are those whose nearby controls ran out (same reason as above).
 
@@ -216,105 +216,105 @@ Controls: 300,000 pool     ──► 127,223 eligible ──► 28,670 matched
 
 `python phewas pre`, then `python phewas post` (each prints its one-page sheet; `python phewas results pre|post` reprints it):
 
-1. `prepare_phewas_inputs.py`: keeps the matched patients' diagnoses; **removes D89.44** (otherwise every case "has HaT" and it tops the list: on synthetic data, OR ≈ 100,000, D11); keeps one window: **pre** = the 3 years before index (primary, D12), **post** = after index to the end of observation (sensitivity). The index day is in neither, because codes entered on the diagnosis day are usually part of the HaT workup.
-2. `pheauxWAS.py` (the study's PheWAS, v1.1.1), for each phecode:
-   - maps ICD-10-CM codes to phecodeX, rolling child phecodes up to their parents;
-   - a patient is a **phecode case** with the code on **2+ distinct dates**; patients with it on 1 date, or with a related phecode, are excluded from that phecode; sex-specific phecodes use one sex only;
-   - phecodes with fewer than **20 cases** are skipped;
-   - fits `phecode ~ HaT_Flag + AgeAtIndex + Sex + Race + Ethnicity + YearsBeforeIndex + ClinicVisits365Before`, plus `YearsAfterIndex` in the post window (D40), by logistic regression, switching to **Firth** regression when *separation* is detected: a variable that predicts the phecode perfectly, where ordinary estimates break down. Since v1.1.1 this includes a phecode whose cases are all HaT patients, as expected for the mast-cell phecode (BI_180.6);
-   - corrects for testing many phecodes with **Bonferroni** (0.05 ÷ phecodes tested) and **Benjamini–Hochberg FDR** (q-values). Results are read by q-value, not raw p.
-3. **Cross-check** (D34): pyPheWAS, a published tool, runs on the same events with its own rules and older phecode system; pheauxWAS is also run with pyPheWAS's rules and map, and the two are compared phecode by phecode. Agreement there checks the code. The study's result is the pheauxWAS phecodeX run.
+1.  `prepare_phewas_inputs.py`: keeps the matched patients' diagnoses; **removes D89.44** (otherwise every case "has HaT" and it tops the list: on synthetic data, OR ≈ 100,000, D11); keeps one window: **pre** = the 3 years before index (primary, D12), **post** = after index to the end of observation (sensitivity). The index day is in neither, because codes entered on the diagnosis day are usually part of the HaT workup.
+2.  `pheauxWAS.py` (the study's PheWAS, v1.1.1), for each phecode:
+    - maps ICD-10-CM codes to phecodeX, rolling child phecodes up to their parents;
+    - a patient is a **phecode case** with the code on **2+ distinct dates**; patients with it on 1 date, or with a related phecode, are excluded from that phecode; sex-specific phecodes use one sex only;
+    - phecodes with fewer than **20 cases** are skipped;
+    - fits `phecode ~ HaT_Flag + AgeAtIndex + Sex + Race + Ethnicity + YearsBeforeIndex + ClinicVisits365Before`, plus `YearsAfterIndex` in the post window (D40), by logistic regression, switching to **Firth** regression when *separation* is detected: a variable that predicts the phecode perfectly, where ordinary estimates break down. Since v1.1.1 this includes a phecode whose cases are all HaT patients, as expected for the mast-cell phecode (BI_180.6);
+    - corrects for testing many phecodes with **Bonferroni** (0.05 ÷ phecodes tested) and **Benjamini–Hochberg FDR** (q-values). Results are read by q-value, not raw p.
+3.  **Cross-check** (D34): pyPheWAS, a published tool, runs on the same events with its own rules and older phecode system; pheauxWAS is also run with pyPheWAS's rules and map, and the two are compared phecode by phecode. Agreement there checks the code. The study's result is the pheauxWAS phecodeX run.
 
 ### Results at a glance
 
-| | Pre (3 years before index; primary) | Post (after index; sensitivity) |
-|---|---|---|
+|   | Pre (3 years before index; primary) | Post (after index; sensitivity) |
+|------------------------|------------------------|------------------------|
 | People | 32,581 (3,911 HaT, 28,670 controls) | same |
 | Diagnoses in window (patient-code-date) | 4,640,043 | 2,985,445 |
 | D89.44 rows removed (both windows' source) | 16,969 | 16,969 |
 | Phecodes tested (≥ 20 cases) | 1,818 | 1,611 |
 | Bonferroni-significant (higher / lower in HaT) | 482 (468 / 14) | 512 (511 / 1) |
-| FDR < 0.05 (higher / lower) | 863 (787 / 76) | 863 (843 / 20) |
-| Fitted with Firth (of which FDR < 0.05) | 473 (122) | 472 (137) |
+| FDR \< 0.05 (higher / lower) | 863 (787 / 76) | 863 (843 / 20) |
+| Fitted with Firth (of which FDR \< 0.05) | 473 (122) | 472 (137) |
 | Cross-check: phecodes compared, same direction | 978, 978 | 933, 933 |
 | Cross-check: correlation of betas, excluding separated phecodes (n) | 0.999 (26 excluded) | 0.999 (32 excluded) |
 
-"Cases" in the tables below are phecode cases in the matched cohort (HaT and controls together). ORs are adjusted; q < 1e-300 means the value underflowed, not that it is zero.
+"Cases" in the tables below are phecode cases in the matched cohort (HaT and controls together). ORs are adjusted; q \< 1e-300 means the value underflowed, not that it is zero.
 
 ### Pre-index (primary): top 20 by p
 
-| Phecode | Description | OR [95% CI] | q | Cases |
-|---|---|---|---|---|
-| BI_180 | Other disorders involving the immune mechanism | 40.9 [35.0–47.9] | <1e-300 | 1,068 |
-| CA_120 | Hemo onc, by cell of origin | 14.7 [12.9–16.6] | <1e-300 | 1,244 |
-| CA_120.1 | Myeloid | 29.3 [25.1–34.2] | <1e-300 | 929 |
-| DE_666 | Urticaria | 47.5 [40.5–55.6] | <1e-300 | 1,103 |
-| DE_679 | Skin symptoms | 6.86 [6.25–7.52] | <1e-300 | 2,654 |
-| SS_823 | Abnormal serum enzyme levels | 19.1 [17.4–21.0] | <1e-300 | 2,496 |
-| SS_823.2 | Abnormal levels of other serum enzymes (R74.8) | 27.2 [24.5–30.2] | <1e-300 | 2,099 |
-| SS_840 | Allergy | 7.95 [7.33–8.63] | <1e-300 | 6,803 |
-| SS_840.2 | Allergy to insects | 13.1 [11.4–15.2] | 7.8e-269 | 849 |
-| NS_343 | Disorders of autonomic nervous system | 22.2 [18.6–26.5] | 8.5e-256 | 667 |
-| SS_840.1 | Food allergy | 13.0 [11.2–15.1] | 4.1e-249 | 798 |
-| MS_712 | Joint derangements and related disorders | 8.50 [7.43–9.73] | 2.9e-209 | 950 |
-| SS_840.8 | Allergies related to other diseases/symptoms | 3.98 [3.64–4.35] | 1.3e-201 | 3,291 |
-| RE_463 | Rhinitis and nasal congestion | 3.59 [3.31–3.90] | 5.9e-201 | 4,541 |
-| MS_712.5 | Disorder of ligament | 29.0 [23.3–36.1] | 8.7e-197 | 493 |
-| MS_712.51 | Hypermobility syndrome | 32.8 [26.1–41.4] | 1.6e-190 | 473 |
-| SS_840.9 | Anaphylactic reaction | 61.2 [46.5–80.5] | 1.7e-188 | 478 |
-| NS_343.7 | Postural orthostatic tachycardia syndrome | 30.4 [24.2–38.1] | 2.7e-187 | 466 |
-| CA_125 | Other malignant neoplasms of lymphoid, hematopoietic and related tissue | 234 [159–345] | 1.1e-165 | 682 |
-| DE_679.3 | Flushing | 13.2 [11.0–15.9] | 4.3e-162 | 504 |
+| Phecode | Description | OR \[95% CI\] | q | Cases |
+|---------------|---------------|---------------|---------------|---------------|
+| BI_180 | Other disorders involving the immune mechanism | 40.9 \[35.0–47.9\] | \<1e-300 | 1,068 |
+| CA_120 | Hemo onc, by cell of origin | 14.7 \[12.9–16.6\] | \<1e-300 | 1,244 |
+| CA_120.1 | Myeloid | 29.3 \[25.1–34.2\] | \<1e-300 | 929 |
+| DE_666 | Urticaria | 47.5 \[40.5–55.6\] | \<1e-300 | 1,103 |
+| DE_679 | Skin symptoms | 6.86 \[6.25–7.52\] | \<1e-300 | 2,654 |
+| SS_823 | Abnormal serum enzyme levels | 19.1 \[17.4–21.0\] | \<1e-300 | 2,496 |
+| SS_823.2 | Abnormal levels of other serum enzymes (R74.8) | 27.2 \[24.5–30.2\] | \<1e-300 | 2,099 |
+| SS_840 | Allergy | 7.95 \[7.33–8.63\] | \<1e-300 | 6,803 |
+| SS_840.2 | Allergy to insects | 13.1 \[11.4–15.2\] | 7.8e-269 | 849 |
+| NS_343 | Disorders of autonomic nervous system | 22.2 \[18.6–26.5\] | 8.5e-256 | 667 |
+| SS_840.1 | Food allergy | 13.0 \[11.2–15.1\] | 4.1e-249 | 798 |
+| MS_712 | Joint derangements and related disorders | 8.50 \[7.43–9.73\] | 2.9e-209 | 950 |
+| SS_840.8 | Allergies related to other diseases/symptoms | 3.98 \[3.64–4.35\] | 1.3e-201 | 3,291 |
+| RE_463 | Rhinitis and nasal congestion | 3.59 \[3.31–3.90\] | 5.9e-201 | 4,541 |
+| MS_712.5 | Disorder of ligament | 29.0 \[23.3–36.1\] | 8.7e-197 | 493 |
+| MS_712.51 | Hypermobility syndrome | 32.8 \[26.1–41.4\] | 1.6e-190 | 473 |
+| SS_840.9 | Anaphylactic reaction | 61.2 \[46.5–80.5\] | 1.7e-188 | 478 |
+| NS_343.7 | Postural orthostatic tachycardia syndrome | 30.4 \[24.2–38.1\] | 2.7e-187 | 466 |
+| CA_125 | Other malignant neoplasms of lymphoid, hematopoietic and related tissue | 234 \[159–345\] | 1.1e-165 | 682 |
+| DE_679.3 | Flushing | 13.2 \[11.0–15.9\] | 4.3e-162 | 504 |
 
-Lower in HaT (FDR < 0.05), top 5: current tobacco use 0.584 [0.505–0.677]; fractures 0.663 [0.578–0.761]; secondary malignant neoplasm 0.29 [0.185–0.457]; nicotine dependence 0.776 [0.703–0.857]; hypertension 0.799 [0.730–0.874].
+Lower in HaT (FDR \< 0.05), top 5: current tobacco use 0.584 \[0.505–0.677\]; fractures 0.663 \[0.578–0.761\]; secondary malignant neoplasm 0.29 \[0.185–0.457\]; nicotine dependence 0.776 \[0.703–0.857\]; hypertension 0.799 \[0.730–0.874\].
 
 ### Post-index (sensitivity): top 20 by p
 
-| Phecode | Description | OR [95% CI] | q | Cases |
-|---|---|---|---|---|
-| BI_180 | Other disorders involving the immune mechanism | 61.1 [50.9–73.5] | <1e-300 | 1,007 |
-| DE_666 | Urticaria | 55.1 [45.6–66.7] | <1e-300 | 884 |
-| SS_823 | Abnormal serum enzyme levels | 11.2 [10.0–12.6] | <1e-300 | 1,483 |
-| SS_823.2 | Abnormal levels of other serum enzymes (R74.8) | 16.3 [14.3–18.5] | <1e-300 | 1,186 |
-| SS_840 | Allergy | 6.43 [5.90–7.02] | <1e-300 | 4,215 |
-| CA_120.1 | Myeloid | 23.2 [19.6–27.4] | 6.6e-297 | 759 |
-| CA_120 | Hemo onc, by cell of origin | 11.8 [10.3–13.5] | 4.6e-282 | 1,032 |
-| NS_343 | Disorders of autonomic nervous system | 24.3 [20.1–29.2] | 1.7e-245 | 644 |
-| MS_712 | Joint derangements and related disorders | 13.3 [11.4–15.5] | 5.4e-236 | 783 |
-| MS_712.5 | Disorder of ligament | 38.7 [30.4–49.4] | 5e-188 | 484 |
-| NS_343.7 | Postural orthostatic tachycardia syndrome | 36.4 [28.6–46.4] | 1.2e-184 | 471 |
-| MS_712.51 | Hypermobility syndrome | 39.9 [31.2–51.2] | 8.2e-184 | 474 |
-| DE_679 | Skin symptoms | 5.11 [4.55–5.75] | 8.9e-161 | 1,503 |
-| RE_463 | Rhinitis and nasal congestion | 3.85 [3.49–4.25] | 1.3e-156 | 2,692 |
-| RE_475 | Asthma | 3.59 [3.26–3.94] | 4.2e-154 | 2,802 |
-| SS_840.9 | Anaphylactic reaction | 44.6 [33.5–59.3] | 7.8e-148 | 384 |
-| GE_978 | Genetic disorders relating to growth and musculoskeletal system | 38.4 [29.1–50.8] | 5.7e-143 | 379 |
-| SS_840.1 | Food allergy | 11.8 [9.74–14.3] | 9.7e-141 | 483 |
-| SS_840.8 | Allergies related to other diseases/symptoms | 4.01 [3.60–4.47] | 5.2e-139 | 1,948 |
-| GI_527 | Abdominal pain | 3.10 [2.84–3.39] | 2.4e-138 | 4,233 |
+| Phecode | Description | OR \[95% CI\] | q | Cases |
+|---------------|---------------|---------------|---------------|---------------|
+| BI_180 | Other disorders involving the immune mechanism | 61.1 \[50.9–73.5\] | \<1e-300 | 1,007 |
+| DE_666 | Urticaria | 55.1 \[45.6–66.7\] | \<1e-300 | 884 |
+| SS_823 | Abnormal serum enzyme levels | 11.2 \[10.0–12.6\] | \<1e-300 | 1,483 |
+| SS_823.2 | Abnormal levels of other serum enzymes (R74.8) | 16.3 \[14.3–18.5\] | \<1e-300 | 1,186 |
+| SS_840 | Allergy | 6.43 \[5.90–7.02\] | \<1e-300 | 4,215 |
+| CA_120.1 | Myeloid | 23.2 \[19.6–27.4\] | 6.6e-297 | 759 |
+| CA_120 | Hemo onc, by cell of origin | 11.8 \[10.3–13.5\] | 4.6e-282 | 1,032 |
+| NS_343 | Disorders of autonomic nervous system | 24.3 \[20.1–29.2\] | 1.7e-245 | 644 |
+| MS_712 | Joint derangements and related disorders | 13.3 \[11.4–15.5\] | 5.4e-236 | 783 |
+| MS_712.5 | Disorder of ligament | 38.7 \[30.4–49.4\] | 5e-188 | 484 |
+| NS_343.7 | Postural orthostatic tachycardia syndrome | 36.4 \[28.6–46.4\] | 1.2e-184 | 471 |
+| MS_712.51 | Hypermobility syndrome | 39.9 \[31.2–51.2\] | 8.2e-184 | 474 |
+| DE_679 | Skin symptoms | 5.11 \[4.55–5.75\] | 8.9e-161 | 1,503 |
+| RE_463 | Rhinitis and nasal congestion | 3.85 \[3.49–4.25\] | 1.3e-156 | 2,692 |
+| RE_475 | Asthma | 3.59 \[3.26–3.94\] | 4.2e-154 | 2,802 |
+| SS_840.9 | Anaphylactic reaction | 44.6 \[33.5–59.3\] | 7.8e-148 | 384 |
+| GE_978 | Genetic disorders relating to growth and musculoskeletal system | 38.4 \[29.1–50.8\] | 5.7e-143 | 379 |
+| SS_840.1 | Food allergy | 11.8 \[9.74–14.3\] | 9.7e-141 | 483 |
+| SS_840.8 | Allergies related to other diseases/symptoms | 4.01 \[3.60–4.47\] | 5.2e-139 | 1,948 |
+| GI_527 | Abdominal pain | 3.10 \[2.84–3.39\] | 2.4e-138 | 4,233 |
 
-Lower in HaT (FDR < 0.05), top 5: current tobacco use 0.575 [0.478–0.691]; secondary malignant neoplasm 0.409 [0.268–0.626]; psychoactive substance abuse 0.461 [0.301–0.706]; diabetes mellitus 0.821 [0.733–0.919]; alcohol abuse and dependence 0.472 [0.302–0.737].
+Lower in HaT (FDR \< 0.05), top 5: current tobacco use 0.575 \[0.478–0.691\]; secondary malignant neoplasm 0.409 \[0.268–0.626\]; psychoactive substance abuse 0.461 \[0.301–0.706\]; diabetes mellitus 0.821 \[0.733–0.919\]; alcohol abuse and dependence 0.472 \[0.302–0.737\].
 
 ### How to read the results
 
-1. **The calculations are verified.** Where pheauxWAS (run with pyPheWAS's map and rules) and pyPheWAS can be compared without separation, their estimates correlate at 0.999 in both windows, and every shared phecode agrees in direction. The overall correlations (0.744 pre, 0.783 post) are lower only because of 26–32 *separated* phecodes, where unpenalized logistic regression gives near-infinite estimates and pyPheWAS's L1 penalty shrinks them, by design.
-2. **Some top hits are the diagnosis itself, not findings (exposure-adjacent).** BI_180 and its child BI_180.6 (mast cell activation syndrome, D89.40–D89.49); SS_823 and SS_823.2 (R74.8, "abnormal levels of other serum enzymes", the usual code for a raised tryptase); CA_120.1, CA_120.15 and CA_125(.1) (mast-cell neoplasms and mastocytosis, C96.2x and D47.0x). These are the codes of the workup that leads to, or follows, a HaT diagnosis. They are reported separately and are the reason for the planned sensitivity analysis that drops all D89.4x codes.
-3. **The phenotype is consistent with the HaT literature.** Urticaria and flushing, anaphylaxis, insect and food allergy, dysautonomia and POTS, joint hypermobility and ligament disorders, rhinitis, asthma and abdominal pain: the multisystem picture reported for HaT, which gives the results face validity.
-4. **Pre-index means "what precedes diagnosis", not "what HaT causes".** HaT is diagnosed by testing, and patients are tested because of these symptoms. The large odds ratios (often 20–60) in the pre-index window largely reflect *why patients are tested* (indication), so they describe the phenotype that brings a patient to diagnosis.
-5. **The same phenotypes persist after diagnosis.** Most top phenotypes appear in both windows with similar or larger odds ratios after index (urticaria 47.5 → 55.1, POTS 30.4 → 36.4, hypermobility 32.8 → 39.9), so they are not only workup around the diagnosis. The shifts fit how diagnosis works: abnormal-tryptase codes fall after diagnosis (SS_823.2: 27.2 → 16.3, since testing precedes it) and mast-cell codes rise (BI_180: 40.9 → 61.1, as ongoing care codes them). New in the post-index top 20: GE_978, the parent of the Ehlers–Danlos codes (Q79.6x, GE_978.22), Marfan syndrome and skeletal dysplasias; with hypermobility this strong it is most plausibly Ehlers–Danlos, coded after genetic evaluation (to confirm from GE_978.22's own row).
-6. **Most hits are "higher in HaT".** 787 of 863 FDR hits pre-index (843 of 863 post) are more common in HaT. HaT patients carry more coded conditions overall even after matching on clinic visits: partly real phenotype, partly specialist workup that a one-year count of office visits does not capture.
-7. **"Lower in HaT" likely reflects population differences.** Tobacco, alcohol and substance use, diabetes and hypertension being less common in HaT patients probably reflects who they are (about three quarters female; likely a different socioeconomic profile) rather than protection. They should be reported with that caveat.
-8. **Many hits are not independent.** Phecodes roll up into their parents (e.g. SS_840 Allergy and its children), so parent and child hits count the same patients; the 482 and 863 overstate the number of distinct findings.
+1.  **The calculations are verified.** Where pheauxWAS (run with pyPheWAS's map and rules) and pyPheWAS can be compared without separation, their estimates correlate at 0.999 in both windows, and every shared phecode agrees in direction. The overall correlations (0.744 pre, 0.783 post) are lower only because of 26–32 *separated* phecodes, where unpenalized logistic regression gives near-infinite estimates and pyPheWAS's L1 penalty shrinks them, by design.
+2.  **Some top hits are the diagnosis itself, not findings (exposure-adjacent).** BI_180 and its child BI_180.6 (mast cell activation syndrome, D89.40–D89.49); SS_823 and SS_823.2 (R74.8, "abnormal levels of other serum enzymes", the usual code for a raised tryptase); CA_120.1, CA_120.15 and CA_125(.1) (mast-cell neoplasms and mastocytosis, C96.2x and D47.0x). These are the codes of the workup that leads to, or follows, a HaT diagnosis. They are reported separately and are the reason for the planned sensitivity analysis that drops all D89.4x codes.
+3.  **The phenotype is consistent with the HaT literature.** Urticaria and flushing, anaphylaxis, insect and food allergy, dysautonomia and POTS, joint hypermobility and ligament disorders, rhinitis, asthma and abdominal pain: the multisystem picture reported for HaT, which gives the results face validity.
+4.  **Pre-index means "what precedes diagnosis", not "what HaT causes".** HaT is diagnosed by testing, and patients are tested because of these symptoms. The large odds ratios (often 20–60) in the pre-index window largely reflect *why patients are tested* (indication), so they describe the phenotype that brings a patient to diagnosis.
+5.  **The same phenotypes persist after diagnosis.** Most top phenotypes appear in both windows with similar or larger odds ratios after index (urticaria 47.5 → 55.1, POTS 30.4 → 36.4, hypermobility 32.8 → 39.9), so they are not only workup around the diagnosis. The shifts fit how diagnosis works: abnormal-tryptase codes fall after diagnosis (SS_823.2: 27.2 → 16.3, since testing precedes it) and mast-cell codes rise (BI_180: 40.9 → 61.1, as ongoing care codes them). New in the post-index top 20: GE_978, the parent of the Ehlers–Danlos codes (Q79.6x, GE_978.22), Marfan syndrome and skeletal dysplasias; with hypermobility this strong it is most plausibly Ehlers–Danlos, coded after genetic evaluation (to confirm from GE_978.22's own row).
+6.  **Most hits are "higher in HaT".** 787 of 863 FDR hits pre-index (843 of 863 post) are more common in HaT. HaT patients carry more coded conditions overall even after matching on clinic visits: partly real phenotype, partly specialist workup that a one-year count of office visits does not capture.
+7.  **"Lower in HaT" likely reflects population differences.** Tobacco, alcohol and substance use, diabetes and hypertension being less common in HaT patients probably reflects who they are (about three quarters female; likely a different socioeconomic profile) rather than protection. They should be reported with that caveat.
+8.  **Many hits are not independent.** Phecodes roll up into their parents (e.g. SS_840 Allergy and its children), so parent and child hits count the same patients; the 482 and 863 overstate the number of distinct findings.
 
 ## 9. Open Decisions
 
 | Decision | Status | Effect |
-|---|---|---|
+|------------------------|------------------------|------------------------|
 | YearsAfterIndex (SMD 0.102): add as a covariate in the post-index PheWAS | **Decided and run** (D40, 2026-10-07): post adds it; pre unchanged; no rematch | Post-index results only |
 | Cases indexed before 2021-10-01 (119) are not matched | Implemented, awaiting confirmation (task list) | Already excluded above |
 | Earlier mast-cell codes (D89.40–D89.49): primary drops D89.44 only and reads BI_180.6 (mast cell activation) as exposure-adjacent; sensitivity drops all D89.4x | Proposed (task list); sensitivity run not built | Confirmed: BI_180 is the top hit in both windows |
 | Sensitivity: cases with D89.44 on 2+ dates (D24) | Planned, not built | Tests whether single-code cases dilute or drive the results |
-| Controls with high baseline tryptase (> 8 ng/mL), possibly undiagnosed HaT | Proposed: drop before matching (task list) | Very few expected; would need rematching |
+| Controls with high baseline tryptase (\> 8 ng/mL), possibly undiagnosed HaT | Proposed: drop before matching (task list) | Very few expected; would need rematching |
 | Case rule: 1+ vs 2+ D89.44 dates; index date | Provisional, questions for the attending (D24) | Sensitivity analysis planned |
 
 ------------------------------------------------------------------------
@@ -331,7 +331,7 @@ Lower in HaT (FDR < 0.05), top 5: current tobacco use 0.575 [0.478–0.691]; sec
 ## Glossary
 
 | Term | Meaning |
-|---|---|
+|------------------------------------|------------------------------------|
 | Phecode | A group of ICD codes representing one clinical phenotype (phecodeX here). |
 | Index date | The date that separates "before" from "after": first D89.44 for cases, a random clinic visit for controls. |
 | Propensity score | A patient's predicted probability of being a case, from the matching variables. |
