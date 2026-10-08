@@ -262,6 +262,40 @@ Removed: `bundling/phewas_vm_bundle.py` (the 2026-10-05 bundle, superseded and r
 
 **Consequences.** Nothing a study run computes changed: the synthetic pipeline from group building to both PheWAS windows gives the same outputs before and after the move. Paths in commands and documents changed; on the VM nothing does.
 
+### D42. One D89.44 is a case: settled
+
+**Settles D24** (no longer provisional; review question 10.1 answered by the user, 2026-10-08).
+
+**Context.** D24 kept the single-code rule pending the attending. A D89.44 diagnosis requires a genetic test (*TPSAB1* copy number), so a single code stands for a tested patient.
+
+**Decision.** D89.44 on at least one date defines a case in the primary analysis. Miscoding is possible but treated as negligible, and is stated as a limitation, not analysed around.
+
+**Consequences.** The review report drops the question and says this in its case definition and limitations. Whether the 2+ date run is still wanted as a robustness check is open (roadmap).
+
+### D43. The reviewers' checks are one command, `python phewas review`
+
+**Context.** The 2026-10-08 review asked for checks that need the results and group files on the VM: whether the cases have high tryptase, utilization the match did not use, how far the whole phenome is shifted, the share of HaT patients with mast-cell neoplasm codes, prevalence in each group beside the ORs, and which ICD codes make up phecodes whose names mislead (hypermobility includes hEDS; "allergy to insects" includes unspecified allergy).
+
+**Decision.** `python phewas review` prints them on one page (D38). pheauxWAS 1.2 writes, for a 0/1 predictor, each phecode's cases and totals in each group; the command reruns pheauxWAS on each finished run's own inputs into `runs/review/` to get them, and checks the rerun gives the same betas. Counts of 1–10 are shown as `<11`. The ten negative-control phecodes (cataract, cerumen, myopia, presbyopia, appendicitis, seborrheic and actinic keratosis, lipoma, kidney stones, dental caries) are a proposal for discussion, chosen as having no known link to HaT, mast cells or hypermobility.
+
+**Rejected, for now.** Specialist (allergy/immunology) visits as a covariate: the encounter files' specialty column is in the pull folders, not the pheauxWAS folder; ED visits and admissions, already in the group files, show unmatched utilization first.
+
+### D44. The HaT cluster is chosen by a stated rule, `python phewas cluster`
+
+**Context.** The report's leading associations (§6.3) came from each window's top 20 by p, which favours common diagnoses and leaves out strong but rarer ones; the user asked for the full set (2026-10-08).
+
+**Decision.** A phecode is in the cluster when it has FDR < 0.05 in both the pre and post windows and an OR of at least twice that window's median OR over all tested phecodes (the background shift), and is not in an exposure-adjacent family (GE_969, BI_180, SS_823, CA_120, CA_125). Children are listed under their nearest parent in the cluster, by pheauxWAS's rollup; families are ordered by their strongest member's smaller OR. `python phewas cluster` prints the first 40 lines and the phecodes lower in HaT in both windows on one page, and writes the full list to `runs/cluster/cluster.csv`. It reports §6.3.1 of the review report.
+
+**Rejected.** Ranking by p (as §6.3 does): it measures certainty, not strength. A fixed OR cut-off: the background shift differs by window, so the cut-off is set relative to it.
+
+### D45. phecodeX's sex file is part of every run; one command runs the study
+
+**Context.** The 2026-10-08 run log showed the study's PheWAS ran without sex restriction: the runner passed only `phecodeX_info.csv`, which has no sex columns, and phecodeX keeps sex-specificity in a separate file (`phecodeX_R_sex.csv`, 320 male- or female-only phecodes) that its own R workflow passes as `sex.restriction`. pheauxWAS read nothing and said nothing. The same log's "no exclusion criteria" warning is expected: phecodeX defines no exclusion ranges, and its workflow uses none.
+
+**Decision.** The runner passes the sex file as a second `--definitions` everywhere it runs phecodeX, and stops if it is missing. After each run it checks the outcome: every sex-specific phecode in the results must carry its restriction (`sex restriction: applied …` in the run log), or the run is marked failed. `python phewas selftest` checks the wiring on a made-up cohort (a female-only phecode coded in both sexes must be analysed in women only, and the check must catch it without the sex file). The bundle carries the sex file to `phecode/` on the VM. `python phewas all` runs the self-test, moves the last run's outputs (not the matching) to `runs/archive/run_<when it started>/`, runs pre, post, review and cluster, and writes every page to `runs/all_results.txt` as well as each step's own files.
+
+**Consequences.** The 2026-10-07 results, with sex-specific phecodes analysed in both sexes, are kept in `runs/archive/` on the VM; the report is updated from the rerun. The tutorial's synthetic data has no sex-specific codes, so its results are unchanged; its command now passes the sex file too.
+
 ------------------------------------------------------------------------
 
 ## The Cosmos Pull

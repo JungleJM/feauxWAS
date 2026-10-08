@@ -2,9 +2,9 @@
 
 Questions for my attending about the HaT PheWAS: patterns in the Epic Cosmos data where a clinical judgement would change how the study is defined. Each says what we saw, what the study does for now, and what I'd like to know.
 
-**The study.** A phenome-wide association study (PheWAS) of hereditary alpha tryptasemia (HaT, ICD-10-CM D89.44) in Epic Cosmos. HaT patients are matched 4:1 to patients with no HaT code, then every diagnosis in the 3 years before the HaT diagnosis is compared between the two groups.
+**The study.** A phenome-wide association study (PheWAS) of hereditary alpha tryptasemia (HaT, ICD-10-CM D89.44) in Epic Cosmos. HaT patients are matched up to 10:1 to patients with no HaT code, then every diagnosis in the 3 years before the HaT diagnosis (and, separately, after it) is compared between the two groups.
 
-Counts are from Cosmos, run 2026-10-01, for diagnoses dated 2018-01-01 to 2026-06-01.
+Counts in this file are from the profile queries run in Cosmos on 2026-10-01, for diagnoses dated 2018-01-01 to 2026-06-01; the study's pull covers 2015-01-01 to 2026-06-01.
 
 ------------------------------------------------------------------------
 
@@ -40,6 +40,8 @@ So most came months to years earlier, not as part of the same visit.
 ------------------------------------------------------------------------
 
 ## 2. Is one D89.44 code enough to count as HaT?
+
+**Settled by me, 2026-10-08 (D42):** a D89.44 requires a genetic test, so one code is a case; miscoding is treated as negligible and stated as a limitation. Kept here for the record.
 
 **What we saw.** 5,967 patients have D89.44 at least once; 3,693 have it on 2 or more different dates. So 2,274 (38%) have it on a single date only. Searching all years (not just from 2018), patients by number of D89.44 dates:
 
