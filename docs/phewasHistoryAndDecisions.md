@@ -219,7 +219,7 @@ Controls: 300,000 pool     ──► 127,223 eligible ──► 28,670 matched
 1.  `prepare_phewas_inputs.py`: keeps the matched patients' diagnoses; **removes D89.44** (otherwise every case "has HaT" and it tops the list: on synthetic data, OR ≈ 100,000, D11); keeps one window: **pre** = the 3 years before index (primary, D12), **post** = after index to the end of observation (sensitivity). The index day is in neither, because codes entered on the diagnosis day are usually part of the HaT workup.
 2.  `pheauxWAS.py` (the study's PheWAS, v1.1.1), for each phecode:
     - maps ICD-10-CM codes to phecodeX, rolling child phecodes up to their parents;
-    - a patient is a **phecode case** with the code on **2+ distinct dates**; patients with it on 1 date, or with a related phecode, are excluded from that phecode; sex-specific phecodes use one sex only;
+    - a patient is a **phecode case** with the code on **2+ distinct dates**; patients with it on 1 date are excluded from that phecode (phecodeX defines no related-phecode exclusions); sex-specific phecodes use one sex only, from phecodeX's sex file (D45);
     - phecodes with fewer than **20 cases** are skipped;
     - fits `phecode ~ HaT_Flag + AgeAtIndex + Sex + Race + Ethnicity + YearsBeforeIndex + ClinicVisits365Before`, plus `YearsAfterIndex` in the post window (D40), by logistic regression, switching to **Firth** regression when *separation* is detected: a variable that predicts the phecode perfectly, where ordinary estimates break down. Since v1.1.1 this includes a phecode whose cases are all HaT patients, as expected for the mast-cell phecode (BI_180.6);
     - corrects for testing many phecodes with **Bonferroni** (0.05 ÷ phecodes tested) and **Benjamini–Hochberg FDR** (q-values). Results are read by q-value, not raw p.
@@ -227,15 +227,17 @@ Controls: 300,000 pool     ──► 127,223 eligible ──► 28,670 matched
 
 ### Results at a glance
 
+From the rerun of 2026-10-08. The first run (2026-10-07) had analysed phecodeX's 320 sex-specific phecodes in both sexes, because the sex file was never passed to pheauxWAS (D45). Fixing it changed little: about 85 fewer phecodes in each window needed Firth regression (the missing male cases of a female-only phecode had looked like separation), a few significance counts moved by single figures, and the leading odds ratios are unchanged.
+
 |   | Pre (3 years before index; primary) | Post (after index; sensitivity) |
 |------------------------|------------------------|------------------------|
 | People | 32,581 (3,911 HaT, 28,670 controls) | same |
 | Diagnoses in window (patient-code-date) | 4,640,043 | 2,985,445 |
 | D89.44 rows removed (both windows' source) | 16,969 | 16,969 |
-| Phecodes tested (≥ 20 cases) | 1,818 | 1,611 |
-| Bonferroni-significant (higher / lower in HaT) | 482 (468 / 14) | 512 (511 / 1) |
-| FDR \< 0.05 (higher / lower) | 863 (787 / 76) | 863 (843 / 20) |
-| Fitted with Firth (of which FDR \< 0.05) | 473 (122) | 472 (137) |
+| Phecodes tested (≥ 20 cases) | 1,817 | 1,611 |
+| Bonferroni-significant (higher / lower in HaT) | 482 (470 / 12) | 514 (513 / 1) |
+| FDR \< 0.05 (higher / lower) | 858 (786 / 72) | 865 (845 / 20) |
+| Fitted with Firth (of which FDR \< 0.05) | 387 (96) | 390 (117) |
 | Cross-check: phecodes compared, same direction | 978, 978 | 933, 933 |
 | Cross-check: correlation of betas, excluding separated phecodes (n) | 0.999 (26 excluded) | 0.999 (32 excluded) |
 
@@ -302,9 +304,19 @@ Lower in HaT (FDR \< 0.05), top 5: current tobacco use 0.575 \[0.478–0.691\]; 
 3.  **The phenotype is consistent with the HaT literature.** Urticaria and flushing, anaphylaxis, insect and food allergy, dysautonomia and POTS, joint hypermobility and ligament disorders, rhinitis, asthma and abdominal pain: the multisystem picture reported for HaT, which gives the results face validity.
 4.  **Pre-index means "what precedes diagnosis", not "what HaT causes".** HaT is diagnosed by testing, and patients are tested because of these symptoms. The large odds ratios (often 20–60) in the pre-index window largely reflect *why patients are tested* (indication), so they describe the phenotype that brings a patient to diagnosis.
 5.  **The same phenotypes persist after diagnosis.** Most top phenotypes appear in both windows with similar or larger odds ratios after index (urticaria 47.5 → 55.1, POTS 30.4 → 36.4, hypermobility 32.8 → 39.9), so they are not only workup around the diagnosis. The shifts fit how diagnosis works: abnormal-tryptase codes fall after diagnosis (SS_823.2: 27.2 → 16.3, since testing precedes it) and mast-cell codes rise (BI_180: 40.9 → 61.1, as ongoing care codes them). New in the post-index top 20: GE_978, the parent of the Ehlers–Danlos codes (Q79.6x, GE_978.22), Marfan syndrome and skeletal dysplasias; with hypermobility this strong it is most plausibly Ehlers–Danlos, coded after genetic evaluation (to confirm from GE_978.22's own row).
-6.  **Most hits are "higher in HaT".** 787 of 863 FDR hits pre-index (843 of 863 post) are more common in HaT. HaT patients carry more coded conditions overall even after matching on clinic visits: partly real phenotype, partly specialist workup that a one-year count of office visits does not capture.
+6.  **Most hits are "higher in HaT".** 786 of 858 FDR hits pre-index (845 of 865 post) are more common in HaT. HaT patients carry more coded conditions overall even after matching on clinic visits: partly real phenotype, partly specialist workup that a one-year count of office visits does not capture.
 7.  **"Lower in HaT" likely reflects population differences.** Tobacco, alcohol and substance use, diabetes and hypertension being less common in HaT patients probably reflects who they are (about three quarters female; likely a different socioeconomic profile) rather than protection. They should be reported with that caveat.
-8.  **Many hits are not independent.** Phecodes roll up into their parents (e.g. SS_840 Allergy and its children), so parent and child hits count the same patients; the 482 and 863 overstate the number of distinct findings.
+8.  **Many hits are not independent.** Phecodes roll up into their parents (e.g. SS_840 Allergy and its children), so parent and child hits count the same patients; the 482 and 858 overstate the number of distinct findings.
+
+### The review checks and the full cluster (2026-10-08)
+
+Discussed with the review report (`docs/reports/HaT_PheWAS_review_2026-10-07.md`, which has the tables); from `python phewas review` and `python phewas cluster` on the rerun.
+
+- **How far everything is shifted.** The median odds ratio across all tested phecodes is 1.46 before index and 1.75 after; ten negative-control phecodes with no known link to HaT (cataract, cerumen, myopia and others) give 1.42 and 1.89. So HaT patients carry roughly 1.5 to 1.9 times the odds of almost any code, mostly from more contact with care: ED visits in the year before index (unmatched) 37% vs 30%, and clinic visits after index 6.45 vs 4.23 days a year. An odds ratio of 3 is therefore only about twice the background; urticaria (47), anaphylaxis (61), POTS (30) and Ehlers–Danlos (41) are twenty to forty times it.
+- **Cases.** Only 18% have a serum tryptase on record (probably outside laboratories); of those, 92% are at or above 8 ng/mL (median 15.3), as expected for HaT. 64% have D89.44 on two or more dates.
+- **The mastocytosis subgroup.** 30% of cases carry a mastocytosis code at some point, mostly D47.09 ("other mast cell neoplasms"); 9% carry systemic mastocytosis (D47.02). It does not explain the phenotype: cases without these codes still show it (anaphylaxis 15.1% vs 0.6% of controls, POTS 10.2% vs 0.5%), and the coded cases are higher on every phenotype, POTS and hypermobility included, so they look more thoroughly evaluated rather than different. Whether D47.09 means confirmed clonal disease is a question for the clinical reviewer.
+- **What the phecode names hide.** "Hypermobility syndrome" includes the Ehlers–Danlos codes; "allergy to insects" is mostly "allergy, unspecified" (T78.40); "anaphylactic reaction" includes "history of anaphylaxis".
+- **The cluster.** 156 phecodes in 90 families are significant in both windows at more than twice the background. They form the mast-cell mediator and allergic core (idiopathic urticaria 91, angioedema 72, anaphylaxis 61), the hEDS–POTS pattern with conditions reported alongside it (Chiari-type malformations, CSF leak, celiac artery compression), eosinophilic and functional GI disease, immunoglobulin deficiencies, other genetic diagnoses that testing tends to find (alpha-1-antitrypsin deficiency, hemochromatosis), and a few unexpected rows for the reviewers (liver malignancy and transplant, adrenal disorders, post-COVID condition). It describes who is diagnosed with HaT and their care; it cannot by itself say what HaT causes.
 
 ## 9. Open Decisions
 

@@ -11,9 +11,9 @@ When an item here is built, delete it from this file and describe the result in 
 | Part | State |
 |------------------------------------|------------------------------------|
 | pheauxWAS 1.2.0 and pyPheWAS 2a8fff1 | Built; pheauxWAS `--selftest` passes (2026-10-08), with the separation fix and counts in each group (design.md) |
-| `python phewas review` (D43), `cluster` (D44), `all` and `selftest` (D45) | `review` and `cluster` run on the VM 2026-10-08, on the run without sex restriction. The sex fix, `all` and `selftest` built and run on the synthetic data (2026-10-08); not yet on the VM. Bundle PACK_ID 0d82f13b |
+| `python phewas review` (D43), `cluster` (D44), `all` and `selftest` (D45) | Built; run on the VM 2026-10-08 with bundle 0d82f13b (`python phewas all`): self-test passed, sex restriction applied in both windows, the first run archived to `runs\archive\run_2026-10-07_0210` |
 | `run_phewas.py` (D33–D37) | Built; run end to end on the synthetic data under the VM's pandas 2.2.3 and numpy 2.1.3: the study run matches the tutorial's results, and the Phecode 1.2 bridge agrees with pyPheWAS within 0.002 in beta. On a 67,000-person, 4.3-million-event copy, pheauxWAS took 8 s and pyPheWAS 1.5 min. On the VM, `match` first failed to start Rscript (2026-10-06); the runner now finds it itself |
-| Matching and the PheWAS on the VM | Matched 2026-10-07: 3,911 of 4,144 eligible cases to 28,670 controls. Pre- and post-index PheWAS run (post adjusted for YearsAfterIndex, D40); results in `docs/phewasHistoryAndDecisions.md` and the 2026-10-07 review report. That run had no sex restriction (D45); the rerun with it (`python phewas all`) started 2026-10-08, and the first run moves to `runs\archive\` on the VM |
+| Matching and the PheWAS on the VM | Matched 2026-10-07: 3,911 of 4,144 eligible cases to 28,670 controls. Pre- and post-index PheWAS run (post adjusted for YearsAfterIndex, D40); results in `docs/phewasHistoryAndDecisions.md` and the 2026-10-07 review report. That run had no sex restriction (D45); rerun with it 2026-10-08, and the report and narrative now carry the rerun's numbers (482 / 858 pre, 514 / 865 post; Firth 387 and 390)
 | Tutorial, remade on Cosmos-shaped synthetic pulls: generator, builder, MatchIt 10:1, `prepare_phewas_inputs.py`, pheauxWAS pre and post | Built and run end to end on the Mac (2026-10-03): 328 of 350 eligible synthetic cases matched, to 2,471 controls |
 | Study design (D4–D13, D24–D26, D42) | Decided; the case rule is settled (D42); the index (D4) is provisional, pending the user's attending (`Attending Questions.md`) |
 | `hat_` pull | Run on the VM, 2026-10-02 (D28): `hat_Patients`, `hat_Encounters`, `hat_Diagnoses`, `hat_Labs`, as parquets there |
@@ -25,10 +25,9 @@ When an item here is built, delete it from this file and describe the result in 
 
 ## Next, In Order
 
-1.  **Rerun the study with sex restriction: `python phewas update` (bundle 0d82f13b), then `python phewas all`**, and send `runs\all_results.txt` page by page. Every number in the review report is then updated from it (D45), and the report's "not applied in this run" notes are removed.
-2.  **Review with the attending and a statistician**: `docs/reports/HaT_PheWAS_review_2026-10-07.md`, section 10 lists the questions. Their answers decide the sensitivity analyses and whether the primary model changes (D13).
-3.  **Build the sensitivity analyses as `python phewas` commands**, once their definitions are agreed: all D89.4x (and possibly R74.8, D47.0x, C96.2x) removed from outcomes; cases with mast-cell neoplasm codes (D47.0x, C96.2x) removed; cases with D89.44 on 2+ dates, if still wanted as a robustness check (D42); conditional or weighted regression; controls with baseline tryptase over 8 ng/mL removed.
-4.  **Review the two group reports** (`hat_group_report.txt`, `control_group_report.txt`): the DiagnosisStatus values dropped, units, who isn't eligible.
+1.  **Review with the attending and a statistician**: `docs/reports/HaT_PheWAS_review_2026-10-07.md`, section 10 lists the questions. Their answers decide the sensitivity analyses and whether the primary model changes (D13).
+2.  **Build the sensitivity analyses as `python phewas` commands**, once their definitions are agreed: all D89.4x (and possibly R74.8, D47.0x, C96.2x) removed from outcomes; cases with mast-cell neoplasm codes (D47.0x, C96.2x) removed; cases with D89.44 on 2+ dates, if still wanted as a robustness check (D42); conditional or weighted regression; controls with baseline tryptase over 8 ng/mL removed.
+3.  **Review the two group reports** (`hat_group_report.txt`, `control_group_report.txt`): the DiagnosisStatus values dropped, units, who isn't eligible.
 
 ------------------------------------------------------------------------
 

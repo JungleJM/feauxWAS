@@ -35,16 +35,14 @@ See if you can update based on our information.**
 
 ## From the results discussion, 2026-10-08
 
-What we found discussing the first results is in the review report (`docs/reports/HaT_PheWAS_review_2026-10-07.md`) and D42–D45. Three things are still open:
+What we found discussing the first results is in the review report (`docs/reports/HaT_PheWAS_review_2026-10-07.md`) and D42–D45. One thing is still open:
 
 ::: {style="border:2px solid #4a90e2; border-radius:6px; padding:8px 12px; margin:8px 0;"}
 **Claude: what is still open from the results discussion**
 
 1.  **A tested comparator.** Persistence after diagnosis shows the phenotype is real and lasting, not that HaT causes it: patients are tested *because* of POTS, hypermobility or anaphylaxis, and they keep those codes after diagnosis whatever the cause. A comparison that removes this is HaT patients against patients who had a serum tryptase drawn (someone suspected mast-cell disease) and have no D89.44: both came through the same door. It needs a new pull (the control pool has 948 tryptase results among 300,000) and a decision that it differs from what D6 rejected (it selects on the test, not on outcome diagnoses). **Recommend:** raise it with the reviewers as the main way to address indication bias; build it if they agree.
-2.  **The report after the rerun.** Every number in the report comes from the run without sex restriction (D45). When `python phewas all` finishes, I update the report from `runs\all_results.txt`, remove its "not applied in this run" notes, and check the mastocytosis, tryptase and background figures still read the same.
-3.  **How to read the cluster (§6.3.1).** A short paragraph grouping the 90 families into themes: mediator symptoms and allergy; hEDS and dysautonomia (Chiari, CSF leak, celiac artery compression, POTS); eosinophilic and functional GI; immunodeficiency; and unexpected rows to ask about (liver malignancy and transplant, alpha-1-antitrypsin deficiency, adrenal disorders, post-COVID). Written after the rerun, from its numbers.
 
-**For you to decide:** 1 (raise it, build it, or neither); 2 and 3 need nothing but the rerun's pages.
+**For you to decide:** 1 (raise it, build it, or neither). The report carries the rerun's numbers and the cluster reading guide (§6.3.1).
 :::
 
 ::: {style="border:2px solid #e2904a; border-radius:6px; padding:8px 12px; margin:8px 0;"}
@@ -53,10 +51,8 @@ What we found discussing the first results is in the review report (`docs/report
 
 ## Suggested order
 
-1.  **The rerun's pages** (`runs\all_results.txt`): every report number depends on them.
-2.  **Report update and the cluster paragraph**, from those pages, before the report goes to the reviewers.
-3.  **Three choices**: items 2 and 3 are now sensitivity analyses in the roadmap; item 1 is in the code and the report (§3.1). Confirm or change.
-4.  **Tested comparator**: for the reviewers; decide after their answers.
+1.  **Three choices**: items 2 and 3 are now sensitivity analyses in the roadmap; item 1 is in the code and the report (§3.1). Confirm or change.
+2.  **Tested comparator**: for the reviewers; decide after their answers.
 
 # Settled
 
