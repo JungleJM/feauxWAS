@@ -10,6 +10,11 @@ On the VM, from the pheauxWAS folder, everything is one short command (D36, D37)
     python phewas results   one page on one PheWAS run, e.g. python phewas results pre (pre and post print it too)
     python phewas pre       the PheWAS, 3 years before index -> runs\pre_3y\
     python phewas post      the PheWAS, after index -> runs\post\
+    python phewas review    one page for the reviewers: tryptase, utilization, background ORs,
+                            the mast-cell neoplasm subgroup, prevalence in each group -> runs\review\
+    python phewas cluster   one page: the strongest associations, consistent in both windows -> runs\cluster\
+    python phewas all       move the last run to runs\archive\, then pre, post, review and cluster,
+                            every page in one file -> runs\all_results.txt
     python phewas update    unpack the newest *bundle*.py in this folder over these scripts
     python phewas vscode    point VSCodium's terminal and R extension at the newest R, in every folder
 
@@ -64,6 +69,32 @@ def pyphewas_dir(root: Path) -> Path:
             return d
     return root / PYPHEWAS
 PYPHEWAS_MIN_CASES = 5           # pyPhewasPipeline's --reg_thresh default
+
+
+def phecode_definitions(root: Path) -> list[Path]:
+    """phecodeX's labels and its sex file. The sex file marks the 320 male- or female-only
+    phecodes; without it pheauxWAS analyses those in both sexes (found 2026-10-08, D45)."""
+    sex = next((p for p in (root / "phecode" / "phecodeX_R_sex.csv",
+                            root / "phecode" / "R_CSVs" / "phecodeX_R_sex.csv") if p.exists()),
+               root / "phecode" / "phecodeX_R_sex.csv")
+    return [need(root / "phecode" / "phecodeX_info.csv", "phecodeX definitions"),
+            need(sex, "phecodeX sex file (phecode/phecodeX_R_sex.csv; python phewas update unpacks it)")]
+
+
+def definitions_args(root: Path) -> list:
+    """pheauxWAS's --definitions takes one file per flag."""
+    return [x for d in phecode_definitions(root) for x in ("--definitions", d)]
+
+
+def sex_unrestricted(root: Path, results: Path) -> list[str]:
+    """Sex-specific phecodes in a results file that were analysed without their sex
+    restriction: should be none."""
+    import pandas as pd
+    sx = pd.read_csv(phecode_definitions(root)[1], dtype=str)
+    only = set(sx.loc[(sx["male_only"].str.upper() == "TRUE") | (sx["female_only"].str.upper() == "TRUE"), "phecode"])
+    r = pd.read_csv(results, dtype={"sex_restriction": str})
+    bad = r[r["phecode"].isin(only) & r["sex_restriction"].fillna("").str.strip().eq("") & (r["n_total"] > 0)]
+    return sorted(bad["phecode"])
 
 
 def die(msg: str) -> None:
@@ -208,7 +239,7 @@ def run(args) -> None:
                       "control diagnoses file")]
     pheauxwas = need(root / "pheauxWAS" / "pheauxWAS.py", "pheauxWAS.py")
     phecode_map = need(root / "phecode" / "phecodeX_ICD_CM_map_flat.csv", "phecodeX map")
-    phecode_info = need(root / "phecode" / "phecodeX_info.csv", "phecodeX definitions")
+    definitions = definitions_args(root)
     prepare = need(HERE / "prepare_phewas_inputs.py", "prepare_phewas_inputs.py (beside run_phewas.py)")
     pyp = pyphewas_dir(root)
     if not args.skip_pyphewas:
@@ -237,8 +268,14 @@ def run(args) -> None:
     out = fresh(run_dir / "pheauxwas")
     if not log.step("pheauxWAS: phecodeX, the study's rules",
                     [py, pheauxwas, *common, "--sex-col", "Sex", "--map", phecode_map,
-                     "--definitions", phecode_info, "--out", out / f"hat_phewas_{name}"], out / "console.txt"):
+                     *definitions, "--out", out / f"hat_phewas_{name}"], out / "console.txt"):
         failed.append("pheauxwas")
+    else:
+        bad = sex_unrestricted(root, out / f"hat_phewas_{name}_results.csv")
+        log.write("  sex restriction: " + ("applied to every sex-specific phecode" if not bad else
+                  f"NOT APPLIED to {len(bad)} sex-specific phecodes (e.g. {', '.join(bad[:5])})"))
+        if bad:
+            failed.append("sex restriction")
 
     # 3. The bridge: pheauxWAS on pyPheWAS's map, with pyPheWAS's rules (D34).
     out = fresh(run_dir / "pheauxwas_phecode12")
@@ -321,7 +358,7 @@ def check(args) -> None:
             line(False, mod, f"({type(e).__name__}){' - pyPheWAS needs it' if mod in ('statsmodels', 'matplotlib', 'tqdm', 'scipy') else ''}")
     line((pyphewas_dir(root) / "bin" / "pyPhewasPipeline").exists(), "pyPheWAS", str(pyphewas_dir(root)))
     for rel in ["pheauxWAS/pheauxWAS.py", "phecode/phecodeX_ICD_CM_map_flat.csv", "phecode/phecodeX_info.csv",
-                "hat_phewas_parquets/hat_group.parquet",
+                "phecode/phecodeX_R_sex.csv", "hat_phewas_parquets/hat_group.parquet",
                 "hat_phewas_parquets/hat_group_diagnoses.parquet", "control_phewas_parquets/control_group.parquet",
                 "control_phewas_parquets/control_group_diagnoses.parquet"]:
         line((root / rel).exists(), rel)
@@ -564,6 +601,484 @@ def run_sheet(run_dir: Path) -> list[str]:
     return L
 
 
+# python phewas review: the checks the 2026-10-08 review asked for, on one page.
+KEY_PHECODES = ["DE_666", "SS_840.9", "NS_343.7", "MS_712.51", "DE_679.3", "SS_840.2", "SS_840.1", "RE_463",
+                "RE_475", "GI_527", "MS_745", "GE_978", "GE_978.22", "BI_180.6", "SS_823.2", "CA_120.15"]
+# Proposed negative-control outcomes, for discussion: no known link to HaT, mast cells or hypermobility.
+NEGATIVE_CONTROLS = ["SO_371", "SO_390.4", "SO_387.2", "SO_387.4", "GI_518", "DE_670", "DE_672.21",
+                     "CA_139.5", "GU_585", "GI_502.11"]
+DRIVERS = [("pre_3y", "MS_712.51"), ("pre_3y", "SS_840.2"), ("pre_3y", "SS_840.9"), ("pre_3y", "CA_125"),
+           ("pre_3y", "GE_978"), ("post", "GE_978")]
+MAST_NEOPLASM = ("D47.0", "C96.2")       # mastocytosis and the other mast-cell neoplasms
+PHENOTYPES = [("urticaria", "DE_666"), ("anaphylaxis", "SS_840.9"), ("insect allergy (Z91.03x)", "Z91.03"),
+              ("flushing", "DE_679.3"), ("POTS", "NS_343.7"), ("hypermobility/EDS", "MS_712.51"),
+              ("fractures", "MS_745")]
+
+
+def masked(n) -> str:
+    """A count, with 1-10 shown as <11 (Cosmos small-cell rule)."""
+    n = int(n)
+    return "<11" if 1 <= n <= 10 else f"{n:,}"
+
+
+def pct(n, d) -> str:
+    n, d = int(n), int(d)
+    return "<11" if 1 <= n <= 10 else (f"{100 * n / d:.1f}%" if d else "-")
+
+
+def review_rerun(root: Path, run_dir: Path) -> Path:
+    """pheauxWAS again on a run's own inputs, into runs/review/<run>/: the same model, now
+    with each phecode's cases and totals in HaT and in controls (pheauxWAS 1.2)."""
+    import pandas as pd
+    name = run_dir.name
+    out = root / "runs" / "review" / name
+    res = out / f"hat_phewas_{name}_results.csv"
+    orig = run_dir / "pheauxwas" / f"hat_phewas_{name}_results.csv"
+    if (res.exists() and "n_cases_exposed" in pd.read_csv(res, nrows=0).columns
+            and (not orig.exists() or res.stat().st_mtime >= orig.stat().st_mtime)):
+        return res
+    events = next(iter(sorted((run_dir / "inputs").glob("diagnosis_events_*.csv"))), None)
+    if events is None:
+        die(f"{run_dir / 'inputs'} has no diagnosis_events_*.csv; rerun python phewas {name.split('_')[0]}.")
+    window = events.stem.split("_")[-1]
+    out.mkdir(parents=True, exist_ok=True)
+    cmd = [sys.executable, need(root / "pheauxWAS" / "pheauxWAS.py", "pheauxWAS.py"),
+           "--people", run_dir / "inputs" / "people_matched.csv", "--id-col", "PatientDurableKey",
+           "--predictors", "HaT_Flag", "--covars", *covariates_for(window), "--events", events,
+           "--events-id-col", "PatientDurableKey", "--code-col", "DiagnosisCode", "--vocab-col", "Vocabulary",
+           "--date-col", "DiagnosisDate", "--sex-col", "Sex",
+           "--map", root / "phecode" / "phecodeX_ICD_CM_map_flat.csv",
+           *definitions_args(root), "--out", out / f"hat_phewas_{name}"]
+    print(f"pheauxWAS on {name}'s inputs, for counts in each group (a minute or two) ...", flush=True)
+    with open(out / "console.txt", "w", encoding="utf-8") as f:
+        if subprocess.run([str(c) for c in cmd], stdout=f, stderr=subprocess.STDOUT).returncode:
+            die(f"pheauxWAS failed on {name}; see {out / 'console.txt'}. Is pheauxWAS.py 1.2 or later "
+                f"(python phewas update)?")
+    bad = sex_unrestricted(root, res)
+    if bad:
+        die(f"sex restriction not applied to {len(bad)} sex-specific phecodes in {res} (e.g. {', '.join(bad[:5])}).")
+    return res
+
+
+def review(args) -> None:
+    text = "\n".join(review_lines(args.root))
+    print(text)
+    (args.root / "runs" / "review").mkdir(parents=True, exist_ok=True)
+    (args.root / "runs" / "review" / "review.txt").write_text(text + "\n", encoding="utf-8")
+
+
+def review_lines(root: Path) -> list[str]:
+    """One page for the reviewers: case validity, utilization the match did not use, how far the
+    whole phenome is shifted, the mast-cell neoplasm subgroup, prevalence in each group, and
+    which ICD codes make up the phecodes in question. Also runs/review/review.txt."""
+    import numpy as np
+    import pandas as pd
+    runs = {n: root / "runs" / n for n in ("pre_3y", "post") if finished(root / "runs" / n)}
+    if "pre_3y" not in runs:
+        die("no finished runs/pre_3y; run python phewas pre first.")
+    cohort = pd.read_parquet(need(root / "runs" / "matching" / "matched_cohort.parquet", "matched cohort"))
+    hat = cohort["HaT_Flag"].astype(int) == 1
+    nh, nc = int(hat.sum()), int((~hat).sum())
+    flag = cohort.set_index("PatientDurableKey")["HaT_Flag"].astype(int)
+    L = [f"REVIEW CHECKS {time.strftime('%Y-%m-%d %H:%M')} (python phewas review); counts 1-10 shown as <11", ""]
+
+    # 1. Cases.
+    num = lambda c: pd.to_numeric(cohort[c], errors="coerce")
+    tc, tmax = num("TryptaseCount").fillna(0), num("TryptaseMax")
+    has_t, high = tc > 0, tmax >= 8
+    L += [f"CASES: {nh:,} matched HaT, {nc:,} controls",
+          f"  serum tryptase on record (any date): HaT {masked((hat & has_t).sum())} ({pct((hat & has_t).sum(), nh)}),"
+          f" controls {masked((~hat & has_t).sum())} ({pct((~hat & has_t).sum(), nc)})",
+          f"  highest >= 8 ng/mL, of those measured: HaT {masked((hat & high).sum())} "
+          f"({pct((hat & high).sum(), (hat & has_t).sum())}), median {tmax[hat].median():.1f}; "
+          f"controls {masked((~hat & high).sum())} ({pct((~hat & high).sum(), (~hat & has_t).sum())})",
+          f"  D89.44 on 2+ dates: {masked((hat & (num('HaTDateCount') >= 2)).sum())} "
+          f"({pct((hat & (num('HaTDateCount') >= 2)).sum(), nh)})", ""]
+
+    # 2. Utilization the match did not use.
+    L.append(f"UTILIZATION, year before index unless said   {'HaT':>23}  {'controls':>23}")
+    for label, col in [("clinic visit days (matched on)", "ClinicVisits365Before"),
+                       ("ED visit days (not matched on)", "EdVisits365Before"),
+                       ("admissions (not matched on)", "Admissions365Before"),
+                       ("clinic visit days, year AFTER index", "ClinicVisits365After")]:
+        v = num(col).fillna(0)
+        cell = lambda m: f"mean {v[m].mean():.2f}, any {pct((v[m] > 0).sum(), m.sum())}"
+        L.append(f"  {label:<42} {cell(hat):>23}  {cell(~hat):>23}")
+    L.append("")
+
+    # 3. The whole phenome: the same model again, now with counts in each group.
+    res = {n: pd.read_csv(review_rerun(root, d)) for n, d in runs.items()}
+    tested = {n: r[r["p"].notna()] for n, r in res.items()}
+    cols = list(runs)
+    same = []
+    for n, d in runs.items():
+        orig = d / "pheauxwas" / f"hat_phewas_{n}_results.csv"
+        if orig.exists():
+            j = tested[n].merge(pd.read_csv(orig), on="phecode", suffixes=("", "_orig"))
+            same.append(f"{n} max |beta diff| {(j['beta'] - j['beta_orig']).abs().max():.1e}")
+    L.append("BACKGROUND: how far the whole phenome is shifted        " + "".join(f"{c:>10}" for c in cols))
+    med = lambda v: f"{v.median():.2f}" if v.notna().any() else "-"
+    stats = [("median OR, all tested phecodes", lambda t: med(t["OR"])),
+             ("share with OR > 1", lambda t: f"{(t['OR'] > 1).mean():.0%}"),
+             ("median OR, not significant (q >= 0.05)", lambda t: med(t.loc[t["q_fdr"] >= 0.05, "OR"])),
+             ("median OR, negative controls (proposed)",
+              lambda t: med(t.loc[t["phecode"].isin(NEGATIVE_CONTROLS), "OR"]))]
+    for label, f in stats:
+        L.append(f"  {label:<53}" + "".join(f"{f(tested[c]):>10}" for c in cols))
+    info = pd.read_csv(root / "phecode" / "phecodeX_info.csv", encoding="latin-1", dtype=str,
+                       usecols=["phecode", "phecode_string"]).set_index("phecode")["phecode_string"]
+    name = lambda p: str(info.get(p, p))
+    neg = []
+    for p in NEGATIVE_CONTROLS:
+        got = [tested[c].loc[tested[c]["phecode"] == p] for c in cols]
+        neg.append(f"{name(p)[:16]} " + "/".join(f"{g['OR'].iloc[0]:.2f}" if len(g) else "-" for g in got))
+    L += ["  negative controls, OR " + "/".join(cols) + ": " + "; ".join(neg[:5]),
+          "    " + "; ".join(neg[5:]),
+          "  (rerun matches the original: " + ("; ".join(same) or "original not found") + ")", ""]
+
+    # 4. Events of both windows, codes normalized; the phecodeX map to name codes.
+    m = pd.read_csv(root / "phecode" / "phecodeX_ICD_CM_map_flat.csv", encoding="latin-1", dtype=str,
+                    usecols=["ICD", "vocabulary_id", "phecode"])
+    m = m[m["vocabulary_id"] == "ICD10CM"]
+    under = lambda q, p: q == p or (q.startswith(p) and ("." in p or q[len(p):len(p) + 1] == "."))
+    def codes_for(p: str) -> set:
+        if "_" not in p:                                    # an ICD prefix, e.g. Z91.03
+            return {"prefix:" + p}
+        return set(m.loc[[under(q, p) for q in m["phecode"]], "ICD"].str.strip().str.upper())
+    def hits(ev: pd.DataFrame, codes: set) -> pd.Series:
+        pre = [c[7:] for c in codes if c.startswith("prefix:")]
+        cats = ev["code"].cat.categories
+        keep = [c for c in cats if c in codes or any(c.startswith(x) for x in pre)]
+        return ev["code"].isin(keep)
+    events = {}
+    for n, d in runs.items():
+        f = next(iter(sorted((d / "inputs").glob("diagnosis_events_*.csv"))))
+        ev = pd.read_csv(f, usecols=["PatientDurableKey", "DiagnosisCode", "DiagnosisDate"],
+                         dtype={"DiagnosisCode": "category"})
+        ev["code"] = ev["DiagnosisCode"].astype(str).str.strip().str.upper().astype("category")
+        ev["hat"] = ev["PatientDurableKey"].map(flag).fillna(0).astype(int)
+        events[n] = ev
+
+    # 5. The mast-cell neoplasm subgroup.
+    pre = events["pre_3y"]
+    neo_pre = pre[pre["code"].astype(str).str.startswith(MAST_NEOPLASM)]
+    every = pd.concat([e[["PatientDurableKey", "code", "hat"]] for e in events.values()])
+    neo_any = every[every["code"].astype(str).str.startswith(MAST_NEOPLASM)]
+    dates = neo_pre[neo_pre["hat"] == 1].groupby("PatientDurableKey")["DiagnosisDate"].nunique()
+    neo_hat = set(neo_any.loc[neo_any["hat"] == 1, "PatientDurableKey"])
+    span = "3y before to end" if "post" in events else "3y before index"
+    L += [f"MAST-CELL NEOPLASM CODES (D47.0x, C96.2x) among the {nh:,} matched HaT",
+          f"  HaT, 3y before index: {masked(len(dates))} ({pct(len(dates), nh)}), on 2+ dates "
+          f"{masked((dates >= 2).sum())};  {span}: {masked(len(neo_hat))} ({pct(len(neo_hat), nh)})",
+          f"  controls, {span}: {masked(neo_any.loc[neo_any['hat'] == 0, 'PatientDurableKey'].nunique())}"]
+    h = neo_any[neo_any["hat"] == 1]
+    by = h.assign(c=np.where(h["code"].astype(str).str.startswith("C96.2"), "C96.2x", h["code"].astype(str))
+                  ).groupby("c")["PatientDurableKey"].nunique()
+    d8941 = every[(every["hat"] == 1) & (every["code"] == "D89.41")]["PatientDurableKey"].nunique()
+    L.append(f"  by code, HaT, {span}: " + "  ".join(f"{c} {masked(n)}" for c, n in by.items())
+             + f";  D89.41 (monoclonal MCAS) {masked(d8941)}")
+    L.append(f"  % with the code on >=1 date, 3y before index   {'HaT+neoplasm*':>13} {'HaT, none':>10} {'controls':>9}")
+    in_neo = pre["PatientDurableKey"].isin(neo_hat)
+    groups = [(pre["hat"] == 1) & in_neo, (pre["hat"] == 1) & ~in_neo, pre["hat"] == 0]
+    sizes = [len(neo_hat), nh - len(neo_hat), nc]
+    for label, p in PHENOTYPES:
+        hit = hits(pre, codes_for(p))
+        cells = [pct(pre.loc[hit & g, "PatientDurableKey"].nunique(), s) for g, s in zip(groups, sizes)]
+        L.append(f"    {label:<44} {cells[0]:>13} {cells[1]:>10} {cells[2]:>9}")
+    L.append(f"    * a mast-cell neoplasm code {span}")
+    L.append("")
+
+    # 6. Prevalence in each group: phecode cases over patients analysed, as the model counts them.
+    L.append("PREVALENCE: the model's cases (2+ dates) over the patients it analysed, in each group")
+    L.append(f"  {'':<10} {'':<30}" + "".join(f"{c + ':   HaT    ctrl      OR':>28}" for c in cols))
+    for p in KEY_PHECODES:
+        cells = []
+        for c in cols:
+            x = res[c].loc[res[c]["phecode"] == p]
+            if not len(x):
+                cells.append(f"{'not observed':>28}")
+                continue
+            x = x.iloc[0]
+            orv = (f"{x['OR']:.3g}" if x["OR"] < 1000 else f"{x['OR']:,.0f}") if pd.notna(x["OR"]) else "nt"
+            cells.append(f"{pct(x['n_cases_exposed'], x['n_total_exposed']):>14} "
+                         f"{pct(x['n_cases_unexposed'], x['n_total_unexposed']):>6} {orv:>7}")
+        L.append(f"  {p:<10} {name(p)[:30]:<30}" + "".join(cells))
+    L.append("  (OR: adjusted, from the model; nt: not tested, under 20 cases)")
+    L.append("")
+
+    # 7. Which ICD codes make up the phecodes in question.
+    L.append("WHAT CODES MAKE THESE PHECODES (patients with the code on >=1 date, HaT/controls; top 5)")
+    for n, p in DRIVERS:
+        if n not in events:
+            continue
+        ev = events[n]
+        x = ev[hits(ev, codes_for(p))]
+        if not len(x):
+            L.append(f"  {n:<6} {p:<10} none")
+            continue
+        g = x.groupby(["code", "hat"], observed=True)["PatientDurableKey"].nunique().unstack(fill_value=0)
+        g = g.reindex(columns=[1, 0], fill_value=0)
+        g = g.assign(t=g.sum(axis=1)).sort_values("t", ascending=False).head(5)
+        L.append(f"  {n:<6} {p:<10} " + "  ".join(f"{c} {masked(r[1])}/{masked(r[0])}" for c, r in g.iterrows()))
+    L.append("Copy this whole page into the chat.")
+    return L
+
+
+# python phewas cluster: the strongest, consistent associations, chosen by a stated rule (D44).
+CLUSTER_FDR = 0.05            # significant in both windows
+CLUSTER_FOLD = 2.0            # OR at least this many times the window's median OR (the background shift)
+# Exposure-adjacent families (report §6.2): the HaT code's own, mast-cell activation, raised tryptase,
+# and the haematological families that hold the mastocytosis codes.
+CLUSTER_ADJACENT = ["GE_969", "BI_180", "SS_823", "CA_120", "CA_125"]
+CLUSTER_MAX_LINES = 40
+
+
+def phecode_parents(p: str) -> list[str]:
+    """MS_712.51 -> MS_712.5, MS_712: the rollup pheauxWAS uses."""
+    out = []
+    while "." in p:
+        p = p[:-1]
+        if p.endswith("."):
+            p = p[:-1]
+        out.append(p)
+    return out
+
+
+def cluster(args) -> None:
+    lines, csv_rows = cluster_lines(args.root, args.page)
+    out = args.root / "runs" / "cluster"
+    out.mkdir(parents=True, exist_ok=True)
+    import pandas as pd
+    pd.DataFrame(csv_rows).to_csv(out / "cluster.csv", index=False)
+    text = "\n".join(lines)
+    (out / "cluster.txt").write_text(text + "\n", encoding="utf-8")
+    print(text)
+
+
+def cluster_lines(root: Path, page: int | None) -> tuple[list[str], list[dict]]:
+    """One page (page None: every row): phecodes significant in both windows with ORs well above the background shift,
+    exposure-adjacent families left out, children under their parents. Also runs/cluster/."""
+    import pandas as pd
+    runs = {n: root / "runs" / n for n in ("pre_3y", "post")}
+    missing = [n for n, d in runs.items() if not finished(d)]
+    if missing:
+        die(f"needs finished runs/pre_3y and runs/post; missing {', '.join(missing)}. Run python phewas pre / post.")
+    res = {n: pd.read_csv(review_rerun(root, d)) for n, d in runs.items()}
+    t = {n: r[r["p"].notna()].set_index("phecode") for n, r in res.items()}
+    median = {n: x["OR"].median() for n, x in t.items()}
+    cut = {n: CLUSTER_FOLD * m for n, m in median.items()}
+    adjacent = lambda p: any(p == a or a in phecode_parents(p) for a in CLUSTER_ADJACENT)
+
+    both = t["pre_3y"].join(t["post"], lsuffix="_pre", rsuffix="_post", how="inner")
+    sig = (both["q_fdr_pre"] < CLUSTER_FDR) & (both["q_fdr_post"] < CLUSTER_FDR)
+    keep = both[sig & (both["OR_pre"] >= cut["pre_3y"]) & (both["OR_post"] >= cut["post"])]
+    dropped = sorted(p for p in keep.index if adjacent(p))
+    keep = keep.drop(dropped)
+    low = both[sig & (both["OR_pre"] < 1) & (both["OR_post"] < 1)].drop(
+        [p for p in both.index if adjacent(p)], errors="ignore")
+
+    # Families: a phecode goes under its nearest ancestor that is also in the cluster.
+    head = {p: next((a for a in phecode_parents(p) if a in keep.index), None) for p in keep.index}
+    roots = [p for p, h in head.items() if h is None]
+    kids = {}
+    for p, h in head.items():
+        if h is not None:
+            kids.setdefault(h, []).append(p)
+    strength = lambda p: min(keep.loc[p, "OR_pre"], keep.loc[p, "OR_post"])
+    family_strength = {}
+    def best(p):
+        family_strength[p] = max([strength(p)] + [best(k) for k in kids.get(p, [])])
+        return family_strength[p]
+    for r in roots:
+        best(r)
+    roots.sort(key=lambda p: -family_strength[p])
+
+    def cells(p: str, w: str) -> str:
+        x = keep.loc[p]
+        s = "_pre" if w == "pre_3y" else "_post"
+        prev = f"{pct(x['n_cases_exposed' + s], x['n_total_exposed' + s])}/{pct(x['n_cases_unexposed' + s], x['n_total_unexposed' + s])}"
+        return f"{x['OR' + s]:>6.3g} [{x['OR_lower95' + s]:.3g}-{x['OR_upper95' + s]:.3g}] {prev:>13}"
+    rows, csv_rows = [], []
+    def walk(p: str, depth: int) -> None:
+        x = keep.loc[p]
+        label = ("  " * depth + ("- " if depth else "") + str(x["description_pre"]))[:40]
+        rows.append(f"  {p:<11} {label:<40} {cells(p, 'pre_3y'):<34} {cells(p, 'post'):<34}")
+        csv_rows.append({"phecode": p, "family": roots_of[p], "depth": depth, "description": x["description_pre"],
+                         **{f"{c}{s}": x[f"{c}{s}"] for s in ("_pre", "_post")
+                            for c in ("OR", "OR_lower95", "OR_upper95", "q_fdr", "n_cases_exposed", "n_total_exposed",
+                                      "n_cases_unexposed", "n_total_unexposed")}})
+        for k in sorted(kids.get(p, []), key=lambda k: -family_strength[k]):
+            walk(k, depth + 1)
+    roots_of = {}
+    for r in roots:
+        stack = [r]
+        while stack:
+            q = stack.pop()
+            roots_of[q] = r
+            stack += kids.get(q, [])
+    for r in roots:
+        walk(r, 0)
+
+    L = [f"CLUSTER {time.strftime('%Y-%m-%d %H:%M')} (python phewas cluster); counts 1-10 shown as <11",
+         f"  rule: FDR < {CLUSTER_FDR:g} in BOTH windows, and OR >= {CLUSTER_FOLD:g} x that window's median OR "
+         f"(pre: {cut['pre_3y']:.2f} = {CLUSTER_FOLD:g} x {median['pre_3y']:.2f}; "
+         f"post: {cut['post']:.2f} = {CLUSTER_FOLD:g} x {median['post']:.2f})",
+         f"  {len(keep):,} phecodes in {len(roots):,} families; children indented under their parents; "
+         f"families by their strongest member's smaller OR",
+         f"  left out as exposure-adjacent ({', '.join(CLUSTER_ADJACENT)} families): "
+         + (", ".join(dropped) if dropped else "none"),
+         "",
+         f"  {'phecode':<11} {'description':<40} {'pre_3y: OR [95% CI]  HaT%/ctrl%':<34} {'post: OR [95% CI]  HaT%/ctrl%':<34}"]
+    pages = max(1, -(-len(rows) // CLUSTER_MAX_LINES))
+    if page is None:
+        L += rows
+    else:
+        page = min(max(1, page), pages)
+        start = (page - 1) * CLUSTER_MAX_LINES
+        L += rows[start:start + CLUSTER_MAX_LINES]
+    if page is not None:
+        L.append(f"  page {page} of {pages} (rows {start + 1}-{min(start + CLUSTER_MAX_LINES, len(rows))} of {len(rows)})"
+             + (f"; next: python phewas cluster {page + 1}" if page < pages else "; all in runs\\cluster\\cluster.csv"))
+    L += ["", f"LOWER IN HaT, FDR < {CLUSTER_FDR:g} in both windows: {len(low):,}; strongest 5 (OR pre / post):"]
+    L += [f"  {p:<11} {str(x['description_pre'])[:40]:<40} {x['OR_pre']:.2f} / {x['OR_post']:.2f}"
+          for p, x in low.assign(m=low[["OR_pre", "OR_post"]].max(axis=1)).sort_values("m").head(5).iterrows()]
+    L.append("Copy this whole page into the chat.")
+    return L, csv_rows
+
+
+def selftest(args) -> int:
+    """The runner's wiring of phecodeX, checked by its outcome: a female-only phecode
+    (GU_615, endometriosis, N80.0) coded in women and in men must be analysed in women only,
+    and the guard must catch it when the sex file is left out (D45)."""
+    import csv
+    import tempfile
+    root = args.root
+    tmp = Path(tempfile.mkdtemp(prefix="phewas_selftest_"))
+    women = [f"P{i:04d}" for i in range(0, 600, 2)]
+    with open(tmp / "people.csv", "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["PatientDurableKey", "HaT_Flag", "Sex", "AgeAtIndex"])
+        for i in range(600):
+            w.writerow([f"P{i:04d}", int(i % 5 == 0), "Female" if i % 2 == 0 else "Male", 30 + i % 40])
+    with open(tmp / "events.csv", "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["PatientDurableKey", "DiagnosisCode", "Vocabulary", "DiagnosisDate"])
+        for i in range(600):
+            if i % 3 == 0:                                   # women and men alike
+                w.writerows([[f"P{i:04d}", "N80.0", "ICD-10-CM", d] for d in ("2024-01-01", "2024-03-01")])
+    def fit(defs: list, name: str) -> Path:
+        out = tmp / name
+        cmd = [sys.executable, need(root / "pheauxWAS" / "pheauxWAS.py", "pheauxWAS.py"),
+               "--people", tmp / "people.csv", "--id-col", "PatientDurableKey", "--predictors", "HaT_Flag",
+               "--covars", "AgeAtIndex", "--events", tmp / "events.csv", "--events-id-col", "PatientDurableKey",
+               "--code-col", "DiagnosisCode", "--vocab-col", "Vocabulary", "--date-col", "DiagnosisDate",
+               "--sex-col", "Sex", "--map", need(root / "phecode" / "phecodeX_ICD_CM_map_flat.csv", "phecodeX map"),
+               *defs, "--no-hash", "--out", out]
+        subprocess.run([str(c) for c in cmd], capture_output=True, text=True)
+        return Path(f"{out}_results.csv")
+    import pandas as pd
+    ok = True
+    res = fit(definitions_args(root), "with_sex")
+    row = pd.read_csv(res, dtype={"sex_restriction": str}).set_index("phecode").loc["GU_615"] if res.exists() else None
+    good = row is not None and row["sex_restriction"] == "F" and int(row["n_total"]) == len(women) and not sex_unrestricted(root, res)
+    print(f"{'PASS' if good else 'FAIL'}  female-only GU_615 analysed in women only "
+          f"(n_total {None if row is None else int(row['n_total'])}, women {len(women)})")
+    ok &= good
+    res = fit(["--definitions", phecode_definitions(root)[0]], "without_sex")
+    caught = res.exists() and "GU_615" in sex_unrestricted(root, res)
+    print(f"{'PASS' if caught else 'FAIL'}  without the sex file, the guard catches it")
+    ok &= caught
+    shutil.rmtree(tmp, ignore_errors=True)
+    print("SELF-TEST " + ("PASSED" if ok else "FAILED"))
+    return 0 if ok else 1
+
+
+# python phewas all: archive the last run, then pre, post, review and cluster, into one file (D45).
+RUN_OUTPUTS = ["pre_3y", "post", "review", "cluster", "sheet.txt", "all_results.txt"]
+
+
+def run_stamp(runs: Path) -> str:
+    """When the run in runs/ started, from pre_3y's run log, as 2026-10-08_0210."""
+    log = runs / "pre_3y" / "run_log.txt"
+    first = log.read_text(encoding="utf-8", errors="replace").split("\n", 1)[0].split() if log.exists() else []
+    if len(first) >= 3 and first[0] == "started":
+        return f"{first[1]}_{first[2][:5].replace(':', '')}"
+    return time.strftime("%Y-%m-%d_%H%M")
+
+
+def archive(root: Path) -> Path | None:
+    """Move the last run's outputs (not the matching, which every run shares) into
+    runs/archive/run_<when it started>/."""
+    runs = root / "runs"
+    here = [runs / n for n in RUN_OUTPUTS if (runs / n).exists()]
+    here += sorted(p for p in runs.glob("*_unfinished_*") if not p.name.startswith("matching"))
+    if not here:
+        return None
+    dest = base = runs / "archive" / f"run_{run_stamp(runs)}"
+    n = 1
+    while dest.exists():
+        n += 1
+        dest = base.with_name(f"{base.name}_{n}")
+    dest.mkdir(parents=True)
+    for p in here:
+        shutil.move(str(p), str(dest / p.name))
+    (dest / "README.txt").write_text(
+        "A finished study run, moved here by python phewas all before the next one.\n"
+        "Its matched cohort is runs/matching (shared by every run, not copied).\n", encoding="utf-8")
+    return dest
+
+
+def study_all(args) -> None:
+    """Archive the last run, run pre, post, review and cluster, and put every page into one
+    file, runs/all_results.txt, beside each step's own files."""
+    import pandas as pd
+    root, runs = args.root, args.root / "runs"
+    need(runs / "matching" / "matched_cohort.parquet", "matched cohort (run python phewas match first)")
+    if selftest(args):                              # stop now, not after an hour, if phecodeX is wired wrong
+        die("the self-test failed (above); nothing was moved or run.")
+    moved = archive(root)
+    print(f"the last run was moved to {moved}" if moved else "no earlier run to move")
+    notes = []
+    for window, lookback, name in [("pre", 3.0, "pre_3y"), ("post", None, "post")]:
+        a = argparse.Namespace(**vars(args))
+        a.window, a.lookback_years, a.name, a.runs = window, lookback, None, None
+        print(f"\n######## {name} ########", flush=True)
+        try:
+            run(a)
+        except SystemExit as e:
+            res = runs / name / "pheauxwas" / f"hat_phewas_{name}_results.csv"
+            if not (finished(runs / name) and res.exists()) or sex_unrestricted(root, res):
+                raise
+            notes.append(f"{name}: {e.code if isinstance(e.code, str) else 'a step after pheauxWAS failed'}; "
+                         f"see runs/{name}/run_log.txt")
+    print("\n######## review and cluster ########", flush=True)
+    review_text = review_lines(root)
+    (runs / "review" / "review.txt").write_text("\n".join(review_text) + "\n", encoding="utf-8")
+    cluster_text, csv_rows = cluster_lines(root, None)
+    (runs / "cluster").mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(csv_rows).to_csv(runs / "cluster" / "cluster.csv", index=False)
+    (runs / "cluster" / "cluster.txt").write_text("\n".join(cluster_text) + "\n", encoding="utf-8")
+    study = sheet_lines(root)
+    (runs / "sheet.txt").write_text("\n".join(study) + "\n", encoding="utf-8")
+
+    sx = pd.read_csv(phecode_definitions(root)[1], dtype=str)
+    n_sex = int(((sx["male_only"].str.upper() == "TRUE") | (sx["female_only"].str.upper() == "TRUE")).sum())
+    drop = "Copy this whole"
+    parts = [("THE STUDY", study), ("PRE-INDEX RESULTS (3 years before index; primary)", run_sheet(runs / "pre_3y")),
+             ("POST-INDEX RESULTS (after index)", run_sheet(runs / "post")),
+             ("REVIEW CHECKS", review_text), ("CLUSTER (every row)", cluster_text)]
+    L = [f"HaT PheWAS: EVERY PAGE OF ONE RUN, {time.strftime('%Y-%m-%d %H:%M')} (python phewas all)",
+         f"  sex restriction from {phecode_definitions(root)[1].name} ({n_sex:,} sex-specific phecodes), checked in both windows; "
+         + ("earlier run moved to " + str(moved.relative_to(root)) if moved else "no earlier run")]
+    L += [f"  NOTE {x}" for x in notes]
+    for i, (title, lines) in enumerate(parts, 1):
+        L += ["", "=" * 100, f"{i}. {title}", "=" * 100] + [l for l in lines if not l.startswith(drop)]
+    L += ["", "End. Screenshot this file page by page and paste the pages into the chat."]
+    (runs / "all_results.txt").write_text("\n".join(L) + "\n", encoding="utf-8")
+    print(f"\nDONE: every page is in runs\\all_results.txt ({len(L):,} lines). Open it in VSCodium and "
+          f"screenshot it page by page." + (f"\n{len(notes)} note(s) at its top." if notes else ""))
+
+
 def results(args) -> None:
     """The one-sheet of one run (pre, post or a run folder's name; default: the latest)."""
     runs = args.root / "runs"
@@ -581,7 +1096,14 @@ def results(args) -> None:
 
 def sheet(args) -> None:
     """One page: everything needed to judge where the study stands, and the next step."""
-    root, lines = args.root, [f"pheauxWAS one-sheet, {time.strftime('%Y-%m-%d %H:%M')}", ""]
+    text = "\n".join(sheet_lines(args.root))
+    print(text)
+    (args.root / "runs").mkdir(exist_ok=True)
+    (args.root / "runs" / "sheet.txt").write_text(text + "\n", encoding="utf-8")
+
+
+def sheet_lines(root: Path) -> list[str]:
+    lines = [f"pheauxWAS one-sheet, {time.strftime('%Y-%m-%d %H:%M')}", ""]
     lines += group_lines(root) + [""]
     runs = root / "runs"
     matched = (runs / "matching" / "matched_cohort.parquet").exists()
@@ -610,10 +1132,7 @@ def sheet(args) -> None:
     else:
         nxt = "send this sheet: results ready to review"
     lines += [f"NEXT: {nxt}", "Copy this whole sheet into the chat."]
-    text = "\n".join(lines)
-    print(text)
-    runs.mkdir(exist_ok=True)
-    (runs / "sheet.txt").write_text(text + "\n", encoding="utf-8")
+    return lines
 
 
 def user_settings_files() -> list[Path]:
@@ -687,6 +1206,11 @@ def main() -> None:
         "--rscript", help="the Rscript program, if not found by itself")
     sub.add_parser("update", help="unpack the newest *bundle*.py here")
     sub.add_parser("sheet", help="one page: where the study stands and the next step")
+    sub.add_parser("review", help="one page for the reviewers, after pre and post: tryptase, utilization, "
+                                  "background ORs, mast-cell neoplasm subgroup, prevalence in each group")
+    sub.add_parser("cluster", help="one page, after pre and post: phecodes significant in both windows with "
+                                   "ORs well above the background, grouped by family (cluster 2: the next page)"
+                   ).add_argument("page", nargs="?", type=int, default=1)
     sub.add_parser("results", help="one page on one PheWAS run (pre, post or its folder name; default the latest)"
                    ).add_argument("name", nargs="?")
     sub.add_parser("balance", help="after match: SMDs over 0.1, unmatched cases, controls per case").add_argument(
@@ -711,12 +1235,15 @@ def main() -> None:
     common.add_argument("--skip-pyphewas", action="store_true", help="run pheauxWAS only")
     common.add_argument("--keep-feature-matrices", action="store_true",
                         help="keep pyPheWAS's feature-matrix CSVs (gigabytes on the real data)")
+    sub.add_parser("selftest", help="check the runner's phecodeX wiring (sex restriction) on a small made-up cohort")
+    sub.add_parser("all", parents=[common], help="move the last run to runs/archive/, then pre, post, review "
+                   "and cluster; every page in runs/all_results.txt")
     sub.add_parser("pre", parents=[common], help="the 3 years before index (D12): run --window pre --lookback-years 3")
     sub.add_parser("post", parents=[common], help="after index: run --window post")
     r = sub.add_parser("run", parents=[common], help="any one window, every tool")
     r.add_argument("--window", choices=["pre", "post", "all"], required=True)
     r.add_argument("--lookback-years", type=float, help="with --window pre: the years before index (study: 3)")
-    commands = {"check", "update", "vscode", "match", "balance", "sheet", "results", "pre", "post", "run"}
+    commands = {"check", "update", "vscode", "match", "balance", "sheet", "results", "review", "cluster", "all", "selftest", "pre", "post", "run"}
     argv = [a[2:] if a.startswith("--") and a[2:] in commands else a for a in sys.argv[1:]]
     args = ap.parse_args(argv)
 
@@ -729,7 +1256,8 @@ def main() -> None:
     elif args.command == "post":
         args.command, args.window, args.lookback_years = "run", "post", None
     {"check": check, "update": update, "vscode": vscode, "match": match, "balance": balance, "sheet": sheet, "results": results,
-     "run": run}[args.command](args)
+     "review": review, "cluster": cluster, "all": study_all, "run": run,
+     "selftest": lambda a: sys.exit(selftest(a))}[args.command](args)
 
 
 if __name__ == "__main__":

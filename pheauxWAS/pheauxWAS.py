@@ -87,7 +87,7 @@ from collections import Counter, defaultdict
 from xml.sax.saxutils import escape as xml_escape
 
 __PROG__ = "pheauxWAS"
-__version__ = "1.1.1"
+__version__ = "1.2.0"
 
 try:
     import numpy as np
@@ -1178,6 +1178,9 @@ def run(args):
         log("complete cases for %s: %d of %d" % (pred, int(ok.sum()), N))
         X = np.column_stack([np.ones(N), mat[:, 0], C])
         X[~ok] = 0.0
+        # A 0/1 predictor also gets its cases and totals in each group, for prevalence.
+        binary = bool(ok.any()) and set(np.unique(mat[ok, 0])) <= {0.0, 1.0}
+        exposed = (mat[:, 0] == 1.0) & ok
         term_names = ["(Intercept)", pred] + cov_names
         rows = []
         n_tested = 0
@@ -1199,8 +1202,14 @@ def run(args):
                    "sex_restriction": sx or "", "n_total": n_tot,
                    "n_cases": n_case, "n_controls": n_tot - n_case,
                    "n_excluded": int(ok.sum()) - n_tot, "beta": None, "se": None,
+                   "n_total_exposed": "", "n_cases_exposed": "",
+                   "n_total_unexposed": "", "n_cases_unexposed": "",
                    "p": None, "lo": None, "hi": None, "model": "",
                    "converged": "", "note": "", "dropped_terms": ""}
+            if binary:
+                e = exposed[inc]
+                row.update(n_total_exposed=int(e.sum()), n_cases_exposed=int(yi[e].sum()),
+                           n_total_unexposed=int((~e).sum()), n_cases_unexposed=int(yi[~e].sum()))
             if n_case < args.min_cases:
                 row["note"] = "fewer than %d cases" % args.min_cases
             elif n_tot - n_case < 1:
@@ -1251,7 +1260,8 @@ def run(args):
     cols = ["predictor", "phecode", "description", "category", "sex_restriction",
             "n_total", "n_cases", "n_controls", "n_excluded", "beta", "se",
             "OR", "OR_lower95", "OR_upper95", "p", "q_fdr", "bonferroni",
-            "model", "converged", "dropped_terms", "note"]
+            "model", "converged", "dropped_terms", "note",
+            "n_total_exposed", "n_cases_exposed", "n_total_unexposed", "n_cases_unexposed"]
     all_rows.sort(key=lambda r: (args.predictors.index(r["predictor"]),
                                  r["p"] if r["p"] is not None else 2.0,
                                  phe_sort_key(r["phecode"])))
@@ -1270,7 +1280,9 @@ def run(args):
                 _fmt(r["p"], "%.4g"), _fmt(r["q"], "%.4g"),
                 "" if r["bonferroni"] is None else ("TRUE" if r["bonferroni"] else "FALSE"),
                 r["model"], "" if r["converged"] == "" else str(bool(r["converged"])).upper(),
-                r["dropped_terms"], r["note"]])
+                r["dropped_terms"], r["note"],
+                r["n_total_exposed"], r["n_cases_exposed"], r["n_total_unexposed"],
+                r["n_cases_unexposed"]])
     log("wrote %s" % res_path)
     log("finished in %.1f s" % (time.time() - t0))
     log_path = args.out + "_log.txt"
@@ -1860,6 +1872,14 @@ def selftest():
                 "--definitions", os.path.join(sd, "defs.csv"), "--no-hash"]
     bys = {r["phecode"]: r for r in run(build_parser().parse_args(
         sep_argv + ["--out", os.path.join(sd, "auto")]))}
+    want = sum(1 for i in range(Ns) if expo[i] and i % 2)
+    check("cases split by a 0/1 predictor: all of 900's cases exposed, the groups add up",
+          bys["900"]["n_cases_exposed"] == want == bys["900"]["n_cases"]
+          and bys["900"]["n_cases_unexposed"] == 0
+          and bys["901"]["n_cases_exposed"] + bys["901"]["n_cases_unexposed"] == bys["901"]["n_cases"]
+          and bys["901"]["n_total_exposed"] + bys["901"]["n_total_unexposed"] == bys["901"]["n_total"]
+          and bys["901"]["n_total_exposed"] == int(sum(expo)),
+          "900: %s of %s exposed" % (bys["900"]["n_cases_exposed"], bys["900"]["n_cases"]))
     check("all cases exposed: separation found, Firth used",
           bys["900"]["model"] == "firth" and np.isfinite(bys["900"]["beta"]) and bys["900"]["p"] < 1e-5,
           "model=%s beta=%s" % (bys["900"]["model"], bys["900"]["beta"]))

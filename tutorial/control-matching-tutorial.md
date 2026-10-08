@@ -107,7 +107,7 @@ python3 pheauxWAS/pheauxWAS.py \
   --sex-col Sex \
   --events tutorial/work/diagnosis_events_pre.csv --events-id-col PatientDurableKey \
   --code-col DiagnosisCode --vocab-col Vocabulary --date-col DiagnosisDate \
-  --map phecode/phecodeX_ICD_CM_map_flat.csv --definitions phecode/phecodeX_info.csv \
+  --map phecode/phecodeX_ICD_CM_map_flat.csv --definitions phecode/phecodeX_info.csv --definitions phecode/R_CSVs/phecodeX_R_sex.csv \
   --out tutorial/results/hat_phewas_pre
 ```
 
