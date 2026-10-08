@@ -25,7 +25,7 @@ When an item here is built, delete it from this file and describe the result in 
 
 ## Next, In Order
 
-1.  **Review with the attending and a statistician**: `docs/reports/HaT_PheWAS_review_2026-10-07.md`, section 10 lists the questions. Their answers decide the sensitivity analyses and whether the primary model changes (D13).
+1.  **Review with the attending and a statistician**: the full and concise reports in `docs/reports/run2_2026-10-08/` (sent as PDF and Word); the full report's section 10 lists the questions. Their answers decide the sensitivity analyses and whether the primary model changes (D13).
 2.  **Build the sensitivity analyses as `python phewas` commands**, once their definitions are agreed: all D89.4x (and possibly R74.8, D47.0x, C96.2x) removed from outcomes; cases with mast-cell neoplasm codes (D47.0x, C96.2x) removed; cases with D89.44 on 2+ dates, if still wanted as a robustness check (D42); conditional or weighted regression; controls with baseline tryptase over 8 ng/mL removed.
 3.  **Review the two group reports** (`hat_group_report.txt`, `control_group_report.txt`): the DiagnosisStatus values dropped, units, who isn't eligible.
 
@@ -34,7 +34,7 @@ When an item here is built, delete it from this file and describe the result in 
 ## Open Problems
 
 
-- **Criticisms of the design and analysis**: every one we can identify is in `docs/reports/HaT_PheWAS_review_2026-10-07.md`, section 8. The major ones: indication bias in the pre-index window, asymmetric index events, health-system and referral confounding (not matched or adjusted), residual healthcare intensity, and the outcome model ignoring the matched design (D13).
+- **Criticisms of the design and analysis**: every one we can identify is in the full report (`docs/reports/run2_2026-10-08/`), section 8. The major ones: indication bias in the pre-index window, asymmetric index events, health-system and referral confounding (not matched or adjusted), residual healthcare intensity, and the outcome model ignoring the matched design (D13).
 
 - **Questions for the user's attending**: the index date and the case rule, in `Attending Questions.md`. Their answers may change D4 and D24.
 - **Sensitivity analyses** beyond post-index: high-utilization controls, symptom-adjacent controls (allergic, GI or immune diagnoses, no known HaT), and negative-control phenotypes. None designed.

@@ -35,7 +35,7 @@ See if you can update based on our information.**
 
 ## From the results discussion, 2026-10-08
 
-What we found discussing the first results is in the review report (`docs/reports/HaT_PheWAS_review_2026-10-07.md`) and D42–D45. One thing is still open:
+What we found discussing the first results is in the review reports (`docs/reports/run2_2026-10-08/` (full and concise reports)) and D42–D45. One thing is still open:
 
 ::: {style="border:2px solid #4a90e2; border-radius:6px; padding:8px 12px; margin:8px 0;"}
 **Claude: what is still open from the results discussion**

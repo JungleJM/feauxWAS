@@ -2,7 +2,7 @@
 
 **Status report for clinical and statistical review — 2026-10-07, revised 2026-10-08**
 
-*Primary (pre-index) and sensitivity (post-index) PheWAS complete; further sensitivity analyses planned. Counts of 1–10 patients are masked (Cosmos small-cell rule). Section 8 sets out every criticism we can identify, Section 10 the specific questions for reviewers. Revised 2026-10-08, with all results from the rerun that applies phecodeX's sex restriction (see §5): corrections to §6.2 and §6.5, the case definition settled (§3.1), the mastocytosis subgroup added (§6.2, §8.1.12, §10), and the full cluster (§6.3.1).*
+*Primary (pre-index) and sensitivity (post-index) PheWAS complete; further sensitivity analyses planned. Counts of 1–10 patients are masked (Cosmos small-cell rule). Section 8 sets out every criticism we can identify, Section 10 the specific questions for reviewers. Revised 2026-10-08: corrections to §6.2 and §6.5, the case definition settled (§3.1), the mastocytosis subgroup added (§6.2, §8.1.12, §10), and the full cluster (§6.3.1).*
 
 ------------------------------------------------------------------------
 
@@ -11,7 +11,7 @@
 - **Design.** Matched cohort PheWAS in Epic Cosmos. Cases: patients with ICD-10-CM D89.44 (HaT); index = first D89.44. Controls: a random pool of 300,000 patients without D89.44, each indexed at one random completed clinic visit. Up to 10 controls per case by propensity-score nearest-neighbour matching, exact on sex and calendar quarter of index.
 - **Cohort.** 5,969 HaT patients[^1] → 4,144 eligible → **3,911 matched** to **28,670 controls** (mean 7.3 per case). All matching covariates balanced (standardized mean difference \< 0.1) except years of follow-up after index (0.102), which is adjusted for in the post-index analysis.
 - **Analysis.** For each phecode (phecodeX, ≥ 20 cases, case = code on ≥ 2 dates), covariate-adjusted logistic regression (Firth under separation), Bonferroni and Benjamini–Hochberg FDR. Primary window: the 3 years before index; sensitivity: after index.
-- **Results.** Pre-index: 1,817 phecodes tested, **482 Bonferroni-significant** (470 higher in HaT), 858 at FDR \< 0.05. Post-index: 1,611 tested, 514 Bonferroni-significant (513 higher). Leading associations in both windows: urticaria (OR 47.5 pre), anaphylaxis (61.2), insect and food allergy, POTS (30.4), joint hypermobility (32.8), flushing, rhinitis/asthma — alongside exposure-adjacent mast-cell and tryptase codes (MCAS, R74.8, mastocytosis).
+- **Results.** Pre-index: 1,818 phecodes tested, **482 Bonferroni-significant** (468 higher in HaT), 863 at FDR \< 0.05. Post-index: 1,611 tested, 512 Bonferroni-significant (511 higher). Leading associations in both windows: urticaria (OR 47.5 pre), anaphylaxis (61.2), insect and food allergy, POTS (30.4), joint hypermobility (32.8), flushing, rhinitis/asthma — alongside exposure-adjacent mast-cell and tryptase codes (MCAS, R74.8, mastocytosis).
 - **Verification.** An independent implementation (pyPheWAS) on identical inputs reproduces the estimates (r = 0.999 on non-separated phecodes, all in the same direction).
 - **A mastocytosis subgroup.** 30% of matched cases carry a mastocytosis code (D47.0x, C96.2x) at some point, mostly D47.09 ("other mast cell neoplasms"); 9% carry systemic mastocytosis (D47.02). HaT is enriched in systemic mastocytosis, whose patients are routinely tested for it. The subgroup does not explain the phenotype: cases without these codes still show it (anaphylaxis 15.1% vs 0.6% of controls, POTS 10.2% vs 0.5%) (§8.1.12).
 - **Main interpretive caveat.** Because HaT is diagnosed by testing driven by symptoms, pre-index associations largely describe the phenotype that leads to testing (indication), not consequences of HaT. Persistence after index supports these being the HaT phenotype rather than transient workup.
@@ -119,7 +119,7 @@ matchit(HaT_Flag ~ AgeAtIndex + YearsBeforeIndex + YearsAfterIndex +
 | Windows | **Pre (primary):** diagnoses in \[index − 3 years, index). **Post (sensitivity):** (index, end of observation\]. The index day is excluded from both |
 | Phecodes | phecodeX (ICD-10-CM map), child phecodes rolled up to parents |
 | Phecode case | Code on ≥ 2 distinct dates in the window |
-| Excluded from a phecode | 1 date only; the wrong sex for one of phecodeX's 320 sex-specific phecodes. No related-phecode exclusions: phecodeX defines no exclusion ranges, and its own workflow uses none |
+| Excluded from a phecode | 1 date only. No related-phecode exclusions: phecodeX defines no exclusion ranges, and its own workflow uses none. Sex restriction: **not applied in this run** (the phecodeX sex file was not passed to the tool), so the 320 sex-specific phecodes were analysed in both sexes, adjusted for sex; being corrected |
 | Phecode control | All other matched patients |
 | Minimum | 20 cases per phecode |
 | Model | `phecode ~ HaT_Flag + AgeAtIndex + Sex + Race + Ethnicity + YearsBeforeIndex + ClinicVisits365Before` (+ `YearsAfterIndex` in post); unconditional logistic regression on the matched cohort, unweighted, ignoring matched sets |
@@ -136,7 +136,7 @@ matchit(HaT_Flag ~ AgeAtIndex + YearsBeforeIndex + YearsAfterIndex +
 |                              | Before index | After index |
 |------------------------------|--------------|-------------|
 | Phecodes observed            | 3,395        | 3,263       |
-| Phecodes tested (≥ 20 cases) | 1,817        | 1,611       |
+| Phecodes tested (≥ 20 cases) | 1,818        | 1,611       |
 
 Codes with no phecode are dropped. **81.3%** of diagnosis rows mapped to a phecode before index (3,774,357 of 4,640,043) and **82.0%** after (2,448,724 of 2,985,445); 99.5% and 91.1% of patients had at least one mapped code. The unmapped rows are almost all Z-codes for encounters, status and screening, not diseases. The ten most frequent before index: Z79.899 (other long-term drug therapy), Z23 (immunization), Z00.00 (general adult examination), Z12.31 (screening mammogram), Z79.4 (insulin use), Z79.01 (anticoagulant use), Z98.890 (other post-procedural states), Z20.822 (COVID-19 exposure), Z01.818 (pre-procedural examination), Z12.11 (screening colonoscopy); after index the list is nearly the same. The accurate description is therefore: *all ICD-10-CM diagnoses recorded in the window were mapped to phecodeX, and every phecode with at least 20 cases was tested.* It is not "every ICD-10 code was tested".
 
@@ -162,11 +162,11 @@ Reviewers are welcome to name codes or phenotypes they want examined this way.
 |------------------------|------------------------|------------------------|
 | Matched patients (HaT / controls) | 32,581 (3,911 / 28,670) | same |
 | Patient-code-date diagnoses in window | 4,640,043 | 2,985,445 |
-| Phecodes tested / not tested (\< 20 cases) | 1,817 / 1,578 | 1,611 / 1,652 |
-| Bonferroni-significant (higher / lower in HaT) | 482 (470 / 12) | 514 (513 / 1) |
-| FDR \< 0.05 (higher / lower) | 858 (786 / 72) | 865 (845 / 20) |
-| Firth fits (of which FDR \< 0.05) | 387 (96) | 390 (117) |
-| FDR hits by category (largest) | GI 95, Neurological 87, Musculoskeletal 86, Endocrine/Metabolic 69, Symptoms 69, Respiratory 55, Cardiovascular 51, Dermatological 51 | Musculoskeletal 97, GI 87, Neurological 82, Endocrine/Metabolic 79, Symptoms 70, Cardiovascular 59, Respiratory 56, Genitourinary 56 |
+| Phecodes tested / not tested (\< 20 cases) | 1,818 / 1,577 | 1,611 / 1,652 |
+| Bonferroni-significant (higher / lower in HaT) | 482 (468 / 14) | 512 (511 / 1) |
+| FDR \< 0.05 (higher / lower) | 863 (787 / 76) | 863 (843 / 20) |
+| Firth fits (of which FDR \< 0.05) | 473 (122) | 472 (137) |
+| FDR hits by category (largest) | GI 95, Neurological 87, Musculoskeletal 86, Endocrine/Metabolic 69, Symptoms 69, Respiratory 55, Cardiovascular 51, Dermatological 51 | Musculoskeletal 97, GI 87, Neurological 82, Endocrine/Metabolic 78, Symptoms 70, Cardiovascular 59, Respiratory 56 |
 
 ### 6.2 Exposure-adjacent phecodes (reported separately)
 
@@ -178,10 +178,10 @@ These capture the diagnostic workup or the diagnosis itself rather than independ
 
 | Phecode | Content (ICD-10-CM) | OR pre | OR post |
 |------------------|------------------|------------------|------------------|
-| BI_180 / BI_180.6 | Mast cell activation syndrome and related (D89.40–D89.43, D89.49) | 40.9 / 650 | 61.1 / 519 |
+| BI_180 / BI_180.6 | Mast cell activation syndrome and related (D89.40–D89.43, D89.49) | 40.9 / 650 | 61.1 / — |
 | SS_823 / SS_823.2 | Abnormal serum enzymes; R74.8 (usual code for raised tryptase) | 19.1 / 27.2 | 11.2 / 16.3 |
-| CA_120.1, CA_120.15 | Myeloid; mast-cell neoplasms (C96.2x, D47.0x incl. systemic mastocytosis D47.02) | 29.3, 897 | 23.2, 1,141 |
-| CA_125, CA_125.1 | CA_125: mainly systemic mastocytosis (D47.02), other mast-cell neoplasms (D47.09, D47.0) and C96.2x, with D47.9 and D47.Z; CA_125.1: cutaneous mastocytosis (D47.01) | 234, 185 | —, 249 |
+| CA_120.1, CA_120.15 | Myeloid; mast-cell neoplasms (C96.2x, D47.0x incl. systemic mastocytosis D47.02) | 29.3, 897 | 23.2, — |
+| CA_125, CA_125.1 | CA_125: mainly systemic mastocytosis (D47.02), other mast-cell neoplasms (D47.09, D47.0) and C96.2x, with D47.9 and D47.Z; CA_125.1: cutaneous mastocytosis (D47.01) | 234, 185 | — |
 
 (— : not in the post-index top results shown on the summary sheet; available in the full results file.)
 
@@ -211,7 +211,7 @@ This table is drawn from each window's top 20 by p-value, which favours common d
 
 #### 6.3.1 Full cluster
 
-*Rerun 2026-10-08, with sex restriction: all 156 phecodes, in 90 families. Female-only phecodes (vulvodynia, menstrual migraine, endometriosis) are percentages of women.*
+*Run 2026-10-08: all 156 phecodes, in 90 families.*
 
 **This run's thresholds:** OR ≥ 2.92 before index (2 × median 1.46) and ≥ 3.51 after (2 × median 1.75). 12 exposure-adjacent phecodes left out: BI_180, BI_180.3, BI_180.31, BI_180.6, CA_120, CA_120.1, CA_120.15, CA_125, CA_125.1, GE_969, SS_823, SS_823.2.
 
@@ -302,7 +302,7 @@ Children are listed under their parent phecode, so a family (e.g. Allergy → Fo
 | SS_807.3 | **Post COVID-19 condition** | 6.4 \[4.82–8.49\] | 2.4% / 0.4% | 12.2 \[8.52–17.6\] | 2.2% / 0.2% |
 | ID_020 | **Borrelia** | 6.13 \[3.75–10\] | 0.8% / 0.1% | 6.41 \[3.62–11.4\] | 0.5% / 0.1% |
 | ID_020.1 | &emsp;↳ Lyme disease | 4.55 \[2.63–7.87\] | 0.5% / 0.1% | 4.88 \[2.5–9.54\] | 0.3% / 0.1% |
-| GU_625.3 | **Vulvodynia** | 6 \[3.22–11.2\] | 0.6% / 0.1% | 7.7 \[3.69–16\] | 0.5% / \<11 |
+| GU_625.3 | **Vulvodynia** | 6.01 \[3.24–11.1\] | 0.4% / 0.1% | 7.73 \[3.73–16\] | 0.4% / \<11 |
 | CA_101.6 | **Malignant neoplasm of the liver and intrahepatic bile ducts** | 5.08 \[2.86–9.03\] | 0.5% / 0.1% | 4.35 \[2.45–7.75\] | 0.5% / 0.1% |
 | CA_101.61 | &emsp;↳ Malignant neoplasm of the liver | 6.74 \[3.61–12.6\] | 0.5% / 0.1% | 5.93 \[3.17–11.1\] | 0.4% / 0.1% |
 | DE_672.1 | **Acute skin changes due to ultraviolet radiation** | 6.26 \[3.56–11\] | 0.6% / 0.1% | 5.9 \[2.74–12.7\] | 0.3% / 0.0% |
@@ -354,7 +354,7 @@ Children are listed under their parent phecode, so a family (e.g. Allergy → Fo
 | RE_494.1 | &emsp;↳ Dysphonia | 3.6 \[2.79–4.64\] | 2.4% / 0.7% | 4.72 \[3.58–6.22\] | 2.3% / 0.5% |
 | MB_291 | **Dissociative and somatoform disorders** | 3.17 \[2.34–4.31\] | 1.6% / 0.5% | 3.86 \[2.79–5.33\] | 1.6% / 0.4% |
 | MB_291.1 | &emsp;↳ Conversion disorder | 3.53 \[2.2–5.66\] | 0.7% / 0.2% | 4.62 \[2.98–7.16\] | 0.9% / 0.2% |
-| NS_331.63 | **Menstrual migraine** | 4.11 \[2.23–7.56\] | 0.6% / 0.1% | 3.51 \[1.83–6.72\] | 0.4% / 0.1% |
+| NS_331.63 | **Menstrual migraine** | 4.08 \[2.3–7.23\] | 0.4% / 0.1% | 3.51 \[1.84–6.7\] | 0.3% / 0.1% |
 | DE_668.3 | **Contact dermatitis** | 3.48 \[2.78–4.35\] | 3.1% / 0.9% | 4.89 \[3.74–6.4\] | 2.6% / 0.5% |
 | NS_331.61 | **Migraine with aura** | 3.48 \[2.95–4.1\] | 6.0% / 1.7% | 3.89 \[3.24–4.67\] | 5.3% / 1.2% |
 | GI_522.14 | **Microscopic colitis** | 3.47 \[2.22–5.43\] | 0.7% / 0.2% | 4.52 \[2.77–7.36\] | 0.6% / 0.1% |
@@ -372,7 +372,7 @@ Children are listed under their parent phecode, so a family (e.g. Allergy → Fo
 | SS_829.2 | **Abnormal level of blood mineral** | 3.26 \[2.34–4.53\] | 1.4% / 0.4% | 3.66 \[2.57–5.22\] | 1.3% / 0.3% |
 | GE_982 | **Genetic susceptibility of disease, NOS** | 3.23 \[2.46–4.23\] | 2.1% / 0.6% | 4.33 \[3.26–5.74\] | 2.2% / 0.4% |
 | RE_477 | **Inhalation lung injury** | 3.2 \[1.62–6.29\] | \<11 / 0.1% | 3.79 \[1.78–8.08\] | \<11 / 0.1% |
-| GU_615 | **Endometriosis** | 3.12 \[2.4–4.07\] | 2.8% / 0.9% | 3.77 \[2.76–5.16\] | 2.2% / 0.6% |
+| GU_615 | **Endometriosis** | 3.16 \[2.43–4.11\] | 2.2% / 0.7% | 3.76 \[2.76–5.12\] | 1.7% / 0.4% |
 | CM_768 | **Congenital deformities of chest and bony thorax** | 3.16 \[1.61–6.2\] | \<11 / 0.1% | 4.3 \[1.97–9.4\] | \<11 / 0.0% |
 | CV_417.1 | **Palpitations** | 3.13 \[2.82–3.48\] | 15.9% / 5.6% | 3.58 \[3.14–4.08\] | 10.4% / 2.9% |
 | SO_395 | **Other diseases of inner ear** | 3.07 \[1.54–6.08\] | \<11 / 0.1% | 3.92 \[1.89–8.14\] | \<11 / 0.1% |
@@ -383,18 +383,6 @@ Children are listed under their parent phecode, so a family (e.g. Allergy → Fo
 | BI_174.2 | **Splenomegaly** | 2.96 \[2.12–4.14\] | 1.3% / 0.4% | 5.77 \[3.77–8.84\] | 1.0% / 0.2% |
 
 Percentages are phecode cases (code on ≥ 2 dates) over the patients analysed for that phecode; \<11 = 1–10 patients, masked. GE_972.5 is a single code, G90.1 (familial dysautonomia, Riley–Day syndrome), a rare inherited disease: in 5.2% of HaT patients it is almost certainly G90.1 used for dysautonomia in general (G90.A for POTS exists only from October 2022), and it is read with NS_343.
-
-**How to read the cluster.** Every phecode here stands at least twice above the background shift (median OR 1.46 before index, 1.75 after), in both windows, so each is more than the general excess of coding in HaT patients. The 90 families fall into a few themes (OR before / after index):
-
-- **Mast-cell mediator and allergic symptoms**, the core: idiopathic urticaria (90.6 / 123), angioedema (71.5 / 60.5), anaphylaxis (61.2 / 44.6), flushing (13.2 / 9.3) and pruritus (7.1 / 6.1); food allergy (13 / 11.8) and food intolerance (27.1 / 37.7); chronic and allergic rhinitis, allergic conjunctivitis, nasal polyps; eosinophilia (17.1 / 11.3).
-- **Connective tissue and autonomic, the hEDS–POTS pattern**: Ehlers–Danlos (40.8 / 57.3), hypermobility (32.8 / 39.9), POTS (30.4 / 36.4), orthostatic hypotension (5.1 / 4.7), chronic fatigue (5.5 / 6.5), and conditions reported alongside hEDS: Chiari-type nervous-system malformations (11.2 / 18.1), CSF leak (7.0 / 15.8), celiac artery compression syndrome (7.5 / 12.5), spinal instability.
-- **Gastrointestinal**: eosinophilic esophagitis (10.5 / 13.9) and gastroenteritis (11 / 15.1), allergic and dietetic colitis (14.9 / 22.4), small-intestinal bacterial overgrowth (12.2 / 13), gastroparesis (5.3 / 7.3), malabsorption and celiac disease, IBS, functional dyspepsia.
-- **Immune**: common variable immunodeficiency (18.4 / 19), IgG-subclass and IgA deficiency, hypogammaglobulinemia (10.3 / 10.3), autoinflammatory syndromes (11.2 / 30.3), Sjögren syndrome. Plausibly found because immunologists measure immunoglobulins during the workup.
-- **Other genetic diagnoses**: alpha-1-antitrypsin deficiency (15.9 / 22.3), hereditary hemochromatosis (3.3 / 4.0), "genetic susceptibility to disease" (3.2 / 4.3). Patients who undergo genetic testing collect further genetic findings, so these may reflect testing rather than HaT.
-- **Neurological and pain**: migraine of several kinds (OR 3.5–4.1), trigeminal and occipital neuralgia, complex regional pain syndrome (5.4 / 5.1), narcolepsy (5.5 / 6.9).
-- **Unexpected, for the clinical reviewer**: malignant neoplasm of the liver (5.1 / 4.4) and liver transplant (7.5 / 7.8), each about 0.5% of HaT patients (some 20 people); adrenal disorders (Cushing syndrome 7.4, adrenal insufficiency 5.8, hyperaldosteronism 5.6); post-COVID condition (6.4 / 12.2); Lyme disease (4.6 / 4.9).
-
-Three cautions. Many rows are small: 0.5% of HaT patients is about 20 people, so their intervals are wide. Parent and child rows share patients, so the 156 rows are about 90 findings. And the cluster describes who is diagnosed with HaT and the care they receive; it cannot separate what HaT causes from why these patients were tested (§7.2, §8.1.1).
 
 **Lower in HaT in both windows** (19 phecodes; strongest 5, OR pre / post): stimulant use disorders 0.20 / 0.16; stimulant abuse or dependence 0.18 / 0.21; permanent atrial fibrillation 0.33 / 0.33; secondary malignant neoplasm 0.29 / 0.41; persistent atrial fibrillation 0.46 / 0.47.
 
@@ -463,14 +451,14 @@ Every weakness we can identify, so reviewers can weigh the results against them.
 
 1.  **Unequal observation time.** The pre-index window is nominally 3 years, but patients with less than 3 years of prior record get a truncated window (adjusted only through `YearsBeforeIndex`). The post-index window varies with follow-up (adjusted through `YearsAfterIndex`). Logistic regression on "ever coded" does not model time at risk. *Remedy:* require ≥ 3 years of prior observation; for post, model rates (Poisson/negative binomial with an offset) or fix the window length.
 2.  **Exposure-adjacent outcomes (major for presentation).** MCAS (D89.40–D89.49), raised tryptase (R74.8) and mastocytosis (D47.0x, C96.2x) codes lead the results; they are part of the diagnostic pathway, not independent phenotypes. *Remedy:* planned sensitivity analysis removing them; report separately.
-3.  **Phecode hierarchy.** Child phecodes roll up into parents, so parent and child hits share patients; 482 or 858 significant phecodes are far fewer distinct findings. *Remedy:* report leaf-level or collapsed results; cluster related phecodes.
-4.  **Two-date case rule and exclusions.** A phecode case needs codes on 2+ dates; 1-date patients are excluded from that phecode's analysis. phecodeX has no related-phecode exclusions, so a phecode's controls can include patients with a closely related phecode (e.g. other autonomic disorders among the controls for POTS), which biases toward the null. Because of the 1-date exclusion, each phecode's denominator differs, and the excluded share can differ between groups.
+3.  **Phecode hierarchy.** Child phecodes roll up into parents, so parent and child hits share patients; 482 or 863 significant phecodes are far fewer distinct findings. *Remedy:* report leaf-level or collapsed results; cluster related phecodes.
+4.  **Two-date case rule and exclusions.** A phecode case needs codes on 2+ dates; 1-date patients are excluded from that phecode's analysis. phecodeX has no related-phecode exclusions, so a phecode's controls can include patients with a closely related phecode (e.g. other autonomic disorders among the controls for POTS), which biases toward the null. Sex-specific phecodes were not restricted to one sex in this run (§5). Because of the 1-date exclusion, each phecode's denominator differs, and the excluded share can differ between groups.
 5.  **Coding, not disease.** Outcomes are billing codes; differences in coding thoroughness between specialist and primary care settings translate directly into "associations".
 
 ### 8.4 Statistics
 
 1.  **Odds ratios exaggerate risk ratios for common outcomes.** Several phecodes are common (allergy: 6,803 cases, \~21% of the cohort); ORs overstate relative risks there. *Remedy:* report absolute prevalences in each group, or risk ratios for common phecodes.
-2.  **Firth fits for 21–24% of tested phecodes** (387 of 1,817 before index, 390 of 1,611 after). These report Wald intervals with penalized likelihood-ratio p-values, which can disagree; profile-likelihood intervals would be consistent. Some separation arises from sparse covariate levels (small race/ethnicity groups) rather than the exposure.
+2.  **Firth fits for 26–29% of tested phecodes.** These report Wald intervals with penalized likelihood-ratio p-values, which can disagree; profile-likelihood intervals would be consistent. Some separation arises from sparse covariate levels (small race/ethnicity groups) rather than the exposure.
 3.  **Multiplicity under dependence.** Bonferroni is very conservative with correlated phecodes; BH assumes positive dependence (likely acceptable). Hierarchical FDR would match the structure better.
 4.  **Extreme p-values.** Many underflow (q \< 1e-300); they carry no ranking information. Effect sizes and intervals should be the basis of interpretation.
 5.  **Winner's curse.** Effect sizes for the top hits are selected for being extreme and will tend to shrink on replication.
@@ -480,7 +468,7 @@ Every weakness we can identify, so reviewers can weigh the results against them.
 
 1.  **Cosmos data quality.** Multi-organization EHR data with varying coding practices, missing race/ethnicity grouped as "Unknown", and site participation changing over time (sites' Cosmos-usable dates are pulled but not yet used to restrict observation).
 2.  **Pull window.** History starts 2015-01-01; a patient whose first D89.44 predates 2015 gets a later index (rare, since the code dates from 2021, but relevant to earlier D89.4x codes).
-3.  **Custom software.** The study's PheWAS runs on pheauxWAS, a purpose-written tool. It is verified against pyPheWAS (Section 6.5, r = 0.999 on comparable phecodes) and by self-tests, but it is not a published package. A fix during this work (v1.1.1) added detection of separation when all of a phecode's cases are exposed; earlier synthetic results were unchanged. A second fix (2026-10-08): the first study run never gave the tool phecodeX's sex file, so its 320 sex-specific phecodes were analysed in both sexes. All results here are from the rerun with it; the change was small (about 85 fewer Firth fits per window, significance counts within single figures, leading odds ratios unchanged), and every run now checks that each sex-specific phecode was restricted.
+3.  **Custom software.** The study's PheWAS runs on pheauxWAS, a purpose-written tool. It is verified against pyPheWAS (Section 6.5, r = 0.999 on comparable phecodes) and by self-tests, but it is not a published package. A fix during this work (v1.1.1) added detection of separation when all of a phecode's cases are exposed; earlier synthetic results were unchanged.
 4.  **Small cells.** Cosmos restricts publication of counts of 1–10 patients; phecodes near the 20-case minimum may have exposure-group cells under 11 and need masking before publication.
 
 ## 9. Planned Sensitivity Analyses
@@ -509,8 +497,7 @@ Every weakness we can identify, so reviewers can weigh the results against them.
 2.  Index date: We had built this assuming the first D89.44 is the right Index anchor. That said, what do you think of setting it to a prior workup (tryptase, MCAS codes) that precedes it?
 3.  Which codes should be treated as exposure-adjacent and excluded in sensitivity analysis: D89.40–D89.49 only, or also R74.8 and mastocytosis (D47.0x, C96.2x)?
 4.  Should controls with elevated baseline tryptase be excluded?
-5.  Ehlers–Danlos is coded for 7.4% of HaT patients before diagnosis and 8.1% after (OR 41 / 57; mostly unspecified EDS, Q79.60, with hEDS Q79.62 under hypermobility). Does that fit clinical experience, and is hEDS usually diagnosed before or after HaT?
-6.  Do the unexpected cluster rows (§6.3.1: liver malignancy and transplant, adrenal disorders, alpha-1-antitrypsin deficiency, post-COVID condition) fit your experience of HaT patients, or of the centres that diagnose them?
+5.  Do the post-index Ehlers–Danlos associations fit clinical experience (hEDS diagnosed after HaT testing)?
 
 **Statistical.**
 
@@ -518,7 +505,7 @@ Every weakness we can identify, so reviewers can weigh the results against them.
 2.  Caliper on the propensity-score probability scale (0.2 SD) rather than the logit: change for consistency with Austin (2011)[^4]?
 3.  Multiplicity across a hierarchy of dependent phecodes: report at leaf level, collapse to parents, or use a hierarchical FDR?
 4.  Utilization adjustment: which additional measures of healthcare intensity are appropriate without conditioning on outcomes?
-5.  Reporting extreme associations: preferred presentation when p underflows and Firth is used for 21–24% of fitted phecodes.
+5.  Reporting extreme associations: preferred presentation when p underflows and Firth is used for \~26% of fitted phecodes.
 6.  Health-system confounding (8.1.3): match, stratify, or restrict controls to diagnosing systems?
 7.  Time at risk (8.3.1): require full windows, or model rates?
 

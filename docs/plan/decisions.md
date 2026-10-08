@@ -296,6 +296,12 @@ Removed: `bundling/phewas_vm_bundle.py` (the 2026-10-05 bundle, superseded and r
 
 **Consequences.** The 2026-10-07 results, with sex-specific phecodes analysed in both sexes, are kept in `runs/archive/` on the VM; the report is updated from the rerun. The tutorial's synthetic data has no sex-specific codes, so its results are unchanged; its command now passes the sex file too.
 
+### D46. Reports: one folder per study run, Quarto sources, one Word template
+
+**Context.** The 2026-10-07 report was revised in place after the rerun (D45), and the user rewrote it as Quarto (`.qmd`) to send as PDF and Word, with a concise version (2026-10-08). The PDF needed a font with "≥" and "↳" (the default drops them silently) and compact title spacing; Word needed compact table-of-contents and table styles.
+
+**Decision.** `docs/reports/` holds one folder per study run, `run<N>_<date>/`, with that run's reports and their rendered PDF and Word files: `run1_2026-10-07/` (the first run's report, restored from git, superseded) and `run2_2026-10-08/` (the full and concise reports sent to the reviewers). Reports are `.qmd`; the PDF block uses Arial with "≥" and "↳" taken from Arial Unicode MS, 1-inch margins and a compact title; Word uses `docs/reports/report-reference.docx` (compact TOC 1–3, smaller title, 9-pt table text). Wide tables set their widths with `tbl-colwidths`, which visual editors keep (they rewrite dash widths). This amends CLAUDE.md's "a newer report gets a new file": a new run's reports get a new folder.
+
 ------------------------------------------------------------------------
 
 ## The Cosmos Pull
