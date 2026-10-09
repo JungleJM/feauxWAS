@@ -13,6 +13,7 @@ On the VM, from the pheauxWAS folder, everything is one short command (D36, D37)
     python phewas review    one page for the reviewers: tryptase, utilization, background ORs,
                             the mast-cell neoplasm subgroup, prevalence in each group -> runs\review\
     python phewas cluster   one page: the strongest associations, consistent in both windows -> runs\cluster\
+    python phewas pvalues   p and q for every phecode the reports cite -> runs\pvalues\pvalues.txt
     python phewas all       move the last run to runs\archive\, then pre, post, review and cluster,
                             every page in one file -> runs\all_results.txt
     python phewas update    unpack the newest *bundle*.py in this folder over these scripts
@@ -1079,6 +1080,90 @@ def study_all(args) -> None:
           f"screenshot it page by page." + (f"\n{len(notes)} note(s) at its top." if notes else ""))
 
 
+# python phewas pvalues: p and q for every phecode the reports cite, from the existing results (D47).
+PVALUE_EXTRA = ["GI_527"]          # cited in the reports but below the cluster's cut-off
+PVALUE_LINES = 45
+
+
+def pvalues(args) -> None:
+    """p and q values, before and after index, for the phecodes the reports cite: the cluster
+    (in its order), the diagnosis-related families, the lower-in-HaT ones, and a few more.
+    Nothing is refitted: it reads each run's results file. Also runs/pvalues/: every tested
+    phecode's OR, CI, p and q in both windows."""
+    import pandas as pd
+    root = args.root
+    runs = {n: root / "runs" / n for n in ("pre_3y", "post")}
+    missing = [n for n, d in runs.items() if not finished(d)]
+    if missing:
+        die(f"needs finished runs/pre_3y and runs/post; missing {', '.join(missing)}.")
+    res = {}
+    for n, d in runs.items():
+        r = pd.read_csv(need(d / "pheauxwas" / f"hat_phewas_{n}_results.csv", f"{n} results"))
+        res[n] = r[r["p"].notna()].set_index("phecode")
+    both = res["pre_3y"].join(res["post"], lsuffix="_pre", rsuffix="_post", how="outer")
+    n_tested = {n: len(r) for n, r in res.items()}
+    out = root / "runs" / "pvalues"
+    out.mkdir(parents=True, exist_ok=True)
+    cols = [f"{c}_{w}" for w in ("pre", "post") for c in ("OR", "OR_lower95", "OR_upper95", "p", "q_fdr", "bonferroni")]
+    desc = both["description_pre"].fillna(both["description_post"])
+    both.assign(description=desc)[["description"] + cols].sort_values("p_pre").to_csv(out / "all_phecodes_p_q.csv")
+
+    # The phecodes the reports cite, in sections.
+    _, cluster_rows = cluster_lines(root, None)
+    order = [(r["phecode"], r["depth"]) for r in cluster_rows]
+    adjacent = [p for p in both.index if any(p == a or a in phecode_parents(p) for a in CLUSTER_ADJACENT)]
+    adjacent = sorted(adjacent, key=lambda p: both.loc[p, "p_pre"] if pd.notna(both.loc[p, "p_pre"]) else 1)
+    lower_both = both[(both["q_fdr_pre"] < 0.05) & (both["q_fdr_post"] < 0.05)
+                      & (both["OR_pre"] < 1) & (both["OR_post"] < 1)].sort_values("p_pre").index.tolist()
+    lower_top = []
+    for w in ("pre", "post"):
+        lower_top += both[(both[f"q_fdr_{w}"] < 0.05) & (both[f"OR_{w}"] < 1)].sort_values(f"p_{w}").head(5).index.tolist()
+    lower = list(dict.fromkeys(lower_both + lower_top))
+    seen = {p for p, _ in order}
+    extra = [p for p in PVALUE_EXTRA if p in both.index and p not in seen]
+    sections = [("CLUSTER (report §6.3.1; children indented)", order),
+                ("DIAGNOSIS-RELATED (report §6.2)", [(p, 0) for p in adjacent if p not in seen]),
+                ("LOWER IN HaT (both windows, and each window's top 5)", [(p, 0) for p in lower if p not in seen]),
+                ("ALSO CITED", [(p, 0) for p in extra])]
+
+    def fp(v) -> str:
+        return "-" if pd.isna(v) else ("<1e-300" if v == 0 else f"{v:.2g}")
+    def fo(v) -> str:
+        return "-" if pd.isna(v) else (f"{v:.3g}" if v < 1000 else f"{v:,.0f}")
+    rows = []
+    for title, items in sections:
+        if not items:
+            continue
+        rows.append(f"{title}")
+        for p, depth in items:
+            x = both.loc[p]
+            star = lambda w: "*" if str(x[f"bonferroni_{w}"]).upper() == "TRUE" else " "
+            label = ("  " * depth + ("- " if depth else "") + str(desc.loc[p]))[:34]
+            rows.append(f"  {p:<11} {label:<34} {fo(x['OR_pre']):>6} {fp(x['p_pre']):>8} {fp(x['q_fdr_pre']):>8}{star('pre')}"
+                        f"  {fo(x['OR_post']):>6} {fp(x['p_post']):>8} {fp(x['q_fdr_post']):>8}{star('post')}")
+    pages = max(1, -(-len(rows) // PVALUE_LINES))
+    page = None if args.page is None else min(max(1, args.page), pages)
+    L = [f"P VALUES {time.strftime('%Y-%m-%d %H:%M')} (python phewas pvalues); from the existing results, nothing refitted",
+         "  p: Wald (logistic regression) or penalized likelihood-ratio (Firth); q: Benjamini-Hochberg FDR",
+         f"  * Bonferroni-significant: p < 0.05/{n_tested['pre_3y']:,} = {0.05 / n_tested['pre_3y']:.2g} before index, "
+         f"0.05/{n_tested['post']:,} = {0.05 / n_tested['post']:.2g} after; <1e-300: below what can be represented",
+         "",
+         f"  {'phecode':<11} {'description':<34} {'OR pre':>6} {'p pre':>8} {'q pre':>8}   {'OR post':>6} {'p post':>8} {'q post':>8}"]
+    if page is None:
+        L += rows
+        L.append(f"  {len(rows):,} lines; every tested phecode: runs\\pvalues\\all_phecodes_p_q.csv")
+    else:
+        start = (page - 1) * PVALUE_LINES
+        L += rows[start:start + PVALUE_LINES]
+        L.append(f"  page {page} of {pages}" + (f"; next: python phewas pvalues {page + 1}" if page < pages else ""))
+    L.append("Screenshot the whole file, page by page, and paste the pages into the chat.")
+    text = "\n".join(L)
+    name = "pvalues.txt" if page is None else f"pvalues_page{page}.txt"
+    (out / name).write_text(text + "\n", encoding="utf-8")
+    print(text)
+    print(f"\nDONE: everything is in runs\\pvalues\\{name}. Open it in VSCodium and screenshot it page by page.")
+
+
 def results(args) -> None:
     """The one-sheet of one run (pre, post or a run folder's name; default: the latest)."""
     runs = args.root / "runs"
@@ -1235,6 +1320,8 @@ def main() -> None:
     common.add_argument("--skip-pyphewas", action="store_true", help="run pheauxWAS only")
     common.add_argument("--keep-feature-matrices", action="store_true",
                         help="keep pyPheWAS's feature-matrix CSVs (gigabytes on the real data)")
+    sub.add_parser("pvalues", help="p and q values for every phecode the reports cite, from the existing results, "
+                   "all in runs/pvalues/pvalues.txt (pvalues 2: one page only)").add_argument("page", nargs="?", type=int)
     sub.add_parser("selftest", help="check the runner's phecodeX wiring (sex restriction) on a small made-up cohort")
     sub.add_parser("all", parents=[common], help="move the last run to runs/archive/, then pre, post, review "
                    "and cluster; every page in runs/all_results.txt")
@@ -1243,7 +1330,7 @@ def main() -> None:
     r = sub.add_parser("run", parents=[common], help="any one window, every tool")
     r.add_argument("--window", choices=["pre", "post", "all"], required=True)
     r.add_argument("--lookback-years", type=float, help="with --window pre: the years before index (study: 3)")
-    commands = {"check", "update", "vscode", "match", "balance", "sheet", "results", "review", "cluster", "all", "selftest", "pre", "post", "run"}
+    commands = {"check", "update", "vscode", "match", "balance", "sheet", "results", "review", "cluster", "all", "selftest", "pvalues", "pre", "post", "run"}
     argv = [a[2:] if a.startswith("--") and a[2:] in commands else a for a in sys.argv[1:]]
     args = ap.parse_args(argv)
 
@@ -1256,7 +1343,7 @@ def main() -> None:
     elif args.command == "post":
         args.command, args.window, args.lookback_years = "run", "post", None
     {"check": check, "update": update, "vscode": vscode, "match": match, "balance": balance, "sheet": sheet, "results": results,
-     "review": review, "cluster": cluster, "all": study_all, "run": run,
+     "review": review, "cluster": cluster, "all": study_all, "run": run, "pvalues": pvalues,
      "selftest": lambda a: sys.exit(selftest(a))}[args.command](args)
 
 

@@ -25,9 +25,10 @@ When an item here is built, delete it from this file and describe the result in 
 
 ## Next, In Order
 
-1.  **Review with the attending and a statistician**: the full and concise reports in `docs/reports/run2_2026-10-08/` (sent as PDF and Word); the full report's section 10 lists the questions. Their answers decide the sensitivity analyses and whether the primary model changes (D13).
-2.  **Build the sensitivity analyses as `python phewas` commands**, once their definitions are agreed: all D89.4x (and possibly R74.8, D47.0x, C96.2x) removed from outcomes; cases with mast-cell neoplasm codes (D47.0x, C96.2x) removed; cases with D89.44 on 2+ dates, if still wanted as a robustness check (D42); conditional or weighted regression; controls with baseline tryptase over 8 ng/mL removed.
-3.  **Review the two group reports** (`hat_group_report.txt`, `control_group_report.txt`): the DiagnosisStatus values dropped, units, who isn't eligible.
+1.  **p-values for the reports**: `python phewas update` (bundle cb9abfdc), then `python phewas pvalues`; send the pages of `runs\pvalues\pvalues.txt`. The p and q columns then go into both reports' tables, and the reports are re-rendered and republished (D47).
+2.  **Review with the attending and a statistician**: the full and concise reports in `docs/reports/run2_2026-10-08/` (sent as PDF and Word); the full report's section 10 lists the questions. Their answers decide the sensitivity analyses and whether the primary model changes (D13).
+3.  **Build the sensitivity analyses as `python phewas` commands**, once their definitions are agreed: all D89.4x (and possibly R74.8, D47.0x, C96.2x) removed from outcomes; cases with mast-cell neoplasm codes (D47.0x, C96.2x) removed; cases with D89.44 on 2+ dates, if still wanted as a robustness check (D42); conditional or weighted regression; controls with baseline tryptase over 8 ng/mL removed.
+4.  **Review the two group reports** (`hat_group_report.txt`, `control_group_report.txt`): the DiagnosisStatus values dropped, units, who isn't eligible.
 
 ------------------------------------------------------------------------
 

@@ -1,0 +1,31 @@
+% PDF settings shared by every QMD (format: pdf: include-in-header).
+% Works on macOS, Windows and Linux: every font named here either is checked for
+% first or ships with TeX itself (Latin Modern), so a PDF always renders.
+
+% A character no loaded font has stops the render with an error naming it
+% ("Missing character: There is no ... (U+....)") instead of silently vanishing.
+% To fix one, add a \newunicodechar line for it below.
+\tracinglostchars=3
+
+% Body text: Arial where installed (macOS, Windows), else Latin Modern Sans
+% (ships with TeX, so present on any machine that can render a Quarto PDF).
+\IfFontExistsTF{Arial}{\setmainfont{Arial}}{\setmainfont{Latin Modern Sans}}
+
+% Symbols the body font lacks, taken from Latin Modern Math (ships with TeX).
+\usepackage{newunicodechar}
+\newfontfamily\symbolfont{Latin Modern Math}
+\newunicodechar{≥}{{\symbolfont ≥}}
+\newunicodechar{≤}{{\symbolfont ≤}}
+\newunicodechar{≠}{{\symbolfont ≠}}
+\newunicodechar{≈}{{\symbolfont ≈}}
+\newunicodechar{±}{{\symbolfont ±}}
+\newunicodechar{→}{{\symbolfont →}}
+\newunicodechar{←}{{\symbolfont ←}}
+\newunicodechar{↳}{{\symbolfont ↳}}
+
+% A compact title block (title, then author and date if given) and less space
+% above section headings; the defaults leave most of page 1 empty.
+\makeatletter
+\renewcommand{\@maketitle}{\begin{center}{\usekomafont{title}\huge\@title\par}\vskip 0.4em{\large\@author\par}\vskip 0.2em{\@date\par}\end{center}\vspace{0.3em}}
+\makeatother
+\RedeclareSectionCommand[beforeskip=0pt,afterskip=0.5\baselineskip]{section}

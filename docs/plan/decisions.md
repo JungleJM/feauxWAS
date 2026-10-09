@@ -302,6 +302,18 @@ Removed: `bundling/phewas_vm_bundle.py` (the 2026-10-05 bundle, superseded and r
 
 **Decision.** `docs/reports/` holds one folder per study run, `run<N>_<date>/`, with that run's reports and their rendered PDF and Word files: `run1_2026-10-07/` (the first run's report, restored from git, superseded) and `run2_2026-10-08/` (the full and concise reports sent to the reviewers). Reports are `.qmd`; the PDF block uses Arial with "≥" and "↳" taken from Arial Unicode MS, 1-inch margins and a compact title; Word uses `docs/reports/report-reference.docx` (compact TOC 1–3, smaller title, 9-pt table text). Wide tables set their widths with `tbl-colwidths`, which visual editors keep (they rewrite dash widths). This amends CLAUDE.md's "a newer report gets a new file": a new run's reports get a new folder.
 
+**Amended (2026-10-09):** the PDF settings moved to `docs/reports/pdf-header.tex`, the same file as the research template's: Arial where installed, else Latin Modern Sans; symbols from Latin Modern Math, which ships with TeX, so the reports render on macOS, Windows and Linux; and `\tracinglostchars=3`, so a character no font has stops the render instead of vanishing. Arial Unicode MS (macOS only) is no longer used.
+
+### D47. p-values for every cited phecode, from the results already computed
+
+**Context.** The reviewers asked for p-values for everything (2026-10-09). pheauxWAS computes p and q for every tested phecode and writes them to each run's results file, but the reports printed only ORs and CIs (and q for each window's top 20).
+
+**Decision.** `python phewas pvalues` prints, from the existing results, p and q in both windows for every phecode the reports cite, with Bonferroni marked, and writes every tested phecode's OR, CI, p and q to `runs/pvalues/all_phecodes_p_q.csv`. No model is refitted. The reports' tables gain p (and q) columns from its pages.
+
+**Rejected.** Rerunning the PheWAS to report p: the values exist; a rerun would only reproduce them.
+
+**Amended (2026-10-09):** one command, one file: `python phewas pvalues` writes every row to `runs/pvalues/pvalues.txt`.
+
 ------------------------------------------------------------------------
 
 ## The Cosmos Pull

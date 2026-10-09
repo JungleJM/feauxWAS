@@ -8,19 +8,9 @@ format:
   pdf:
     toc: true
     toc-depth: 3
-    mainfont: "Arial"
     geometry:
       - margin=1in
-    include-in-header:
-      text: |
-        \usepackage{newunicodechar}
-        \newfontfamily\symbolfont{Arial Unicode MS}
-        \newunicodechar{≥}{{\symbolfont ≥}}
-        \newunicodechar{↳}{{\symbolfont ↳}}
-        \makeatletter
-        \renewcommand{\@maketitle}{\begin{center}{\usekomafont{title}\huge\@title\par}\end{center}\vspace{0.5em}}
-        \makeatother
-        \RedeclareSectionCommand[beforeskip=0pt,afterskip=0.5\baselineskip]{section}
+    include-in-header: ../pdf-header.tex
   html:
     toc: false
     toc-depth: 3

@@ -32,7 +32,7 @@ if __name__ == "__main__":
         cmd += ["--file", f]
     cmd += ["--dir", "pheauxWAS=pheauxWAS", "--dir", f"{stage}=phecode",
             "--check-deps", "numpy,pandas,pyarrow,scipy,statsmodels,matplotlib,tqdm",
-            "--note", "python phewas check|match|balance|sheet|results|pre|post|review|cluster|all|update|vscode"]
+            "--note", "python phewas check|match|balance|sheet|results|pre|post|review|cluster|pvalues|all|update|vscode"]
     code = subprocess.run(cmd, cwd=ROOT).returncode
     shutil.rmtree(stage, ignore_errors=True)
     sys.exit(code)
