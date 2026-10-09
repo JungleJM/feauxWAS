@@ -196,20 +196,18 @@ These capture the diagnostic workup or the diagnosis itself rather than independ
 - **D47.0x and C96.2x** (mastocytosis; ICD-10-CM classifies mastocytosis among the neoplasms of hematopoietic tissue, following the WHO, though most systemic mastocytosis is indolent) point to a **subgroup**: HaT is more common in systemic mastocytosis than in the general population, and patients with mastocytosis are tested for HaT, so some cases are mastocytosis patients who also carry HaT. In CA_125, 682 patients are phecode cases before index with an OR of 234; an OR this large means nearly all of them are HaT patients, so the subgroup may be of the order of one in six cases. Their own phenotype (anaphylaxis, venom reactions, flushing, bone disease) overlaps the HaT signal (§8.1.12).
 
 | Phecode | Content (ICD-10-CM) | OR pre | p pre | OR post | p post |
-|---|---|---|---|---|---|
+|------------|------------|------------|------------|------------|------------|
 | BI_180 / BI_180.6 | Mast cell activation syndrome and related (D89.40–D89.43, D89.49) | 40.9 / 650 | \<1e-300\* / 2.6e-100\* | 61.1 / 519 | \<1e-300\* / 1.4e-125\* |
 | SS_823 / SS_823.2 | Abnormal serum enzymes; R74.8 (usual code for raised tryptase) | 19.1 / 27.2 | \<1e-300\* / \<1e-300\* | 11.2 / 16.3 | \<1e-300\* / \<1e-300\* |
 | CA_120.1, CA_120.15 | Myeloid; mast-cell neoplasms (C96.2x, D47.0x incl. systemic mastocytosis D47.02) | 29.3, 897 | \<1e-300\*, 2.3e-71\* | 23.2, 1,141 | 2.5e-299\*, 1.5e-44\* |
 | CA_125, CA_125.1 | CA_125: mainly systemic mastocytosis (D47.02), other mast-cell neoplasms (D47.09, D47.0) and C96.2x, with D47.9 and D47.Z; CA_125.1: cutaneous mastocytosis (D47.01) | 234, 185 | 1.1e-167\*, 3.9e-53\* | 271, 249 | 7.2e-113\*, 3.5e-44\* |
-
-: {tbl-colwidths="[14,38,12,12,12,12]"}
 
 p: Wald test (logistic regression) or penalized likelihood-ratio test (Firth); \* Bonferroni-significant (p \< 0.05/1,817 = 2.8e-05 before index, 0.05/1,611 = 3.1e-05 after); \<1e-300: below what can be represented. q (FDR) and p for every tested phecode: supplementary file *HaT PheWAS all phecodes p and q.csv*.
 
 ### 6.3 Leading non-adjacent associations, both windows
 
 | Phecode | Description | OR pre \[95% CI\] | p pre | OR post \[95% CI\] | p post |
-|---|---|---|---|---|---|
+|------------|------------|------------|------------|------------|------------|
 | DE_666 | Urticaria | 47.5 \[40.5–55.6\] | \<1e-300\* | 55.1 \[45.6–66.7\] | \<1e-300\* |
 | SS_840.9 | Anaphylactic reaction | 61.2 \[46.5–80.5\] | 1.5e-190\* | 44.6 \[33.5–59.3\] | 7.8e-150\* |
 | NS_343.7 | Postural orthostatic tachycardia syndrome | 30.4 \[24.2–38.1\] | 2.7e-189\* | 36.4 \[28.6–46.4\] | 8.1e-187\* |
@@ -225,8 +223,6 @@ p: Wald test (logistic regression) or penalized likelihood-ratio test (Firth); \
 | RE_475 | Asthma | 3.06 \[2.82–3.33\] | 1.1e-149\* | 3.59 \[3.26–3.94\] | 3.9e-156\* |
 | GI_527 | Abdominal pain | 2.64 \[2.44–2.85\] | 1.3e-129\* | 3.10 \[2.84–3.39\] | 3e-140\* |
 | GE_978 | Genetic disorders of growth and musculoskeletal system (mainly Ehlers–Danlos, unspecified, Q79.60) | 27.1 \[21.1–34.8\] | 1.2e-148\* | 38.4 \[29.1–50.8\] | 6e-145\* |
-
-: {tbl-colwidths="[11,35,18,9,18,9]"}
 
 Every p in this table is below 1e-74. Many hits are hierarchically related (parent and child phecodes share patients). p: Wald test (logistic regression) or penalized likelihood-ratio test (Firth); \* Bonferroni-significant (p \< 0.05/1,817 = 2.8e-05 before index, 0.05/1,611 = 3.1e-05 after); \<1e-300: below what can be represented. q (FDR) and p for every tested phecode: supplementary file *HaT PheWAS all phecodes p and q.csv*.
 
@@ -247,7 +243,7 @@ This table is drawn from each window's top 20 by p-value, which favours common d
 Children are listed under their parent phecode, so a family (e.g. Allergy → Food allergy) reads as one finding, not several. Families are ordered by their strongest member, judged by the smaller of its two ORs. Each row gives the OR with its 95% CI and the percentage of HaT patients and of controls who are phecode cases, in each window.
 
 | Phecode | Description | OR pre \[95% CI\] | p pre | HaT / controls pre | OR post \[95% CI\] | p post | HaT / controls post |
-|---|---|---|---|---|---|---|---|
+|---------|---------|---------|---------|---------|---------|---------|---------|
 | DE_666 | **Urticaria** | 47.5 \[40.5–55.6\] | \<1e-300\* | 25.6% / 0.7% | 55.1 \[45.6–66.7\] | \<1e-300\* | 20.8% / 0.5% |
 | DE_666.2 | ↳ Idiopathic urticaria | 90.6 \[59.5–138\] | 2.8e-98\* | 7.2% / 0.1% | 123 \[80.7–189\] | 1.3e-109\* | 9.6% / 0.1% |
 | DE_666.4 | ↳ Dermatographic urticaria | 19 \[10.8–33.4\] | 2.2e-24\* | 1.1% / 0.1% | 56.4 \[20.9–153\] | 1.1e-22\* | 0.7% / \<11 |
@@ -405,8 +401,6 @@ Children are listed under their parent phecode, so a family (e.g. Allergy → Fo
 | NS_333.4 | **Circadian rhythm sleep disorder** | 2.98 \[1.86–4.78\] | 5.2e-05 | 0.6% / 0.2% | 4.28 \[2.39–7.67\] | 1.9e-05\* | 0.4% / 0.1% |
 | BI_174.2 | **Splenomegaly** | 2.96 \[2.12–4.14\] | 1.7e-10\* | 1.3% / 0.4% | 5.77 \[3.77–8.84\] | 8.4e-16\* | 1.0% / 0.2% |
 
-: {tbl-colwidths="[10,20,15,12,9,15,12,9]"}
-
 Percentages are phecode cases (code on ≥ 2 dates) over the patients analysed for that phecode; \<11 = 1–10 patients, masked. GE_972.5 is a single code, G90.1 (familial dysautonomia, Riley–Day syndrome), a rare inherited disease: in 5.2% of HaT patients it is almost certainly G90.1 used for dysautonomia in general (G90.A for POTS exists only from October 2022), and it is read with NS_343.
 
 **How to read the cluster.** Every phecode here stands at least twice above the background shift (median OR 1.46 before index, 1.75 after), in both windows, so each is more than the general excess of coding in HaT patients. The 90 families fall into a few themes (OR before / after index):
@@ -426,7 +420,7 @@ Three cautions. Many rows are small: 0.5% of HaT patients is about 20 people, so
 ### 6.4 Lower in HaT (FDR \< 0.05, top 5)
 
 | Pre-index | OR \[95% CI\] | p | Post-index | OR \[95% CI\] | p |
-|---|---|---|---|---|---|
+|------------|------------|------------|------------|------------|------------|
 | Current tobacco use | 0.584 \[0.505–0.677\] | 7.1e-13\* | Current tobacco use | 0.575 \[0.478–0.691\] | 4.2e-09\* |
 | Fractures | 0.663 \[0.578–0.761\] | 5.2e-09\* | Secondary malignant neoplasm | 0.409 \[0.268–0.626\] | 3.7e-05 |
 | Secondary malignant neoplasm | 0.29 \[0.185–0.457\] | 8.7e-08\* | Psychoactive substance abuse | 0.461 \[0.301–0.706\] | 0.00037 |

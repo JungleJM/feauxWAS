@@ -14,7 +14,7 @@ format:
     embed-resources: true
 ---
 
-**For clinical and statistical review, 2026-10-09.** A shortened version of the full status report (*HaT pheWAS full report 10-9*), which has every table, the full list of 156 cluster phecodes, and the details behind each point below. Counts of 1–10 patients are masked (Cosmos small-cell rule).
+**For clinical and statistical review, 2026-10-09.** A shortened version of the full status report (*HaT pheWAS preliminary (full) report 10-9*), which has every table, the full list of 156 cluster phecodes, and the details behind each point below. Counts of 1–10 patients are masked (Cosmos small-cell rule).
 
 ## 1. What we did
 

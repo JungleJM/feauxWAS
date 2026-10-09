@@ -328,7 +328,7 @@ Removed: `bundling/phewas_vm_bundle.py` (the 2026-10-05 bundle, superseded and r
 
 **Context.** By 2026-10-09 `docs/reports/` held run 1 (first PheWAS), run 2 (rerun with sex restriction) and run 3 (run 2's results with p-values); the user asked to clean up.
 
-**Decision.** `docs/reports/` keeps only the newest run folder (`run3_2026-10-09/`) beside the shared `report-reference.docx` and `pdf-header.tex`. Runs 1 and 2 were committed (commit before this decision's) and then removed; they stay in the git history. The full report is named "full report", the concise one "preliminary report" (the user's naming, 2026-10-09). PDF tables are set one size smaller than the text (`pdf-header.tex`), so tables with p-value columns fit.
+**Decision.** `docs/reports/` keeps only the newest run folder (`run3_2026-10-09/`) beside the shared `report-reference.docx` and `pdf-header.tex`. Runs 1 and 2 were committed (commit before this decision's) and then removed; they stay in the git history. The reports are named "preliminary (full) report" and "preliminary (concise) report" (the user's naming, 2026-10-09). PDF tables are set one size smaller than the text (`pdf-header.tex`), so tables with p-value columns fit.
 
 **Amends D46** (one folder per run, all kept).
 
