@@ -19,9 +19,9 @@ format:
     self-contained-math: true
 ---
 
-**Status report for clinical and statistical review — 2026-10-07, revised 2026-10-08**
+**Status report for clinical and statistical review — 2026-10-07, revised 2026-10-08 and 2026-10-09**
 
-*Primary (pre-index) and sensitivity (post-index) PheWAS complete; further sensitivity analyses planned. Counts of 1–10 patients are masked (Cosmos small-cell rule). Section 8 sets out every criticism we can identify, Section 10 the specific questions for reviewers. Revised 2026-10-08, with all results from the rerun that applies phecodeX's sex restriction (see §5): corrections to §6.2 and §6.5, the case definition settled (§3.1), the mastocytosis subgroup added (§6.2, §8.1.12, §10), and the full cluster (§6.3.1).*
+*Primary (pre-index) and sensitivity (post-index) PheWAS complete; further sensitivity analyses planned. Counts of 1–10 patients are masked (Cosmos small-cell rule). Section 8 sets out every criticism we can identify, Section 10 the specific questions for reviewers. Revised 2026-10-08, with all results from the rerun that applies phecodeX's sex restriction (see §5): corrections to §6.2 and §6.5, the case definition settled (§3.1), the mastocytosis subgroup added (§6.2, §8.1.12, §10), and the full cluster (§6.3.1). Revised 2026-10-09: p-values in every results table, checked on the VM against the original output (§6), and a supplementary file with OR, 95% CI, p and q for every tested phecode.*
 
 ------------------------------------------------------------------------
 

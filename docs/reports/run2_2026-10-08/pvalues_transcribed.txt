@@ -1,0 +1,207 @@
+P VALUES 2026-10-09 13:02 (python phewas pvalues); from the existing results, nothing refitted
+  p: Wald (logistic regression) or penalized likelihood-ratio (Firth); q: Benjamini-Hochberg FDR
+  * Bonferroni-significant: p < 0.05/1,817 = 2.8e-05 before index, 0.05/1,611 = 3.1e-05 after; <1e-300: below what can be represented
+
+  phecode     description                        OR pre    p pre    q pre   OR post   p post   q post
+CLUSTER (report §6.3.1; children indented)
+  DE_666      Urticaria                            47.5  <1e-300  <1e-300*    55.1  <1e-300  <1e-300*
+  DE_666.2      - Idiopathic urticaria             90.6  2.8e-98  1.1e-96*     123 1.3e-109   6e-108*
+  DE_666.4      - Dermatographic urticaria           19  2.2e-24  2.8e-23*    56.4  1.1e-22  1.1e-21*
+  DE_666.1      - Allergic urticaria               16.9  4.4e-12  3.4e-11*    12.2  4.3e-08  1.9e-07*
+  SS_812.2    Angioneurotic edema                  71.5 5.3e-100  2.2e-98*    60.5    4e-50    8e-49*
+  SS_840      Allergy                              7.95  <1e-300  <1e-300*    6.43  <1e-300  <1e-300*
+  SS_840.9      - Anaphylactic reaction            61.2 1.5e-190 1.7e-188*    44.6 7.8e-150 7.8e-148*
+  SS_840.1      - Food allergy                       13 2.5e-251   4e-249*    11.8 1.1e-142 9.7e-141*
+  SS_840.18       - Egg allergy                    10.9  4.6e-17  4.7e-16*    13.7  9.8e-16  7.5e-15*
+  SS_840.11       - Peanut allergy                 8.07  2.5e-24  3.2e-23*    8.08  8.8e-17  7.5e-16*
+  SS_840.17       - Milk allergy                   7.08  1.7e-19  1.8e-18*       8  4.5e-12  2.7e-11*
+  SS_840.12       - Seafood allergy                 6.3  7.5e-22  8.8e-21*     7.4  3.1e-18  2.7e-17*
+  SS_840.2      - Allergy to insects               13.1 3.9e-271 7.8e-269*    9.97 2.6e-130 1.8e-128*
+  SS_840.6      - Drug and medical agent allergy   3.37 8.9e-115 4.6e-113*    3.73  2.5e-99  1.1e-97*
+  SS_840.62       - Allergy to anesthetic agent    5.74  7.3e-06    3e-05*    10.6  7.5e-08  3.2e-07*
+  SS_840.64       - Allergy to analgesic agent     3.88  1.2e-26  1.7e-25*    4.63  5.7e-28  6.9e-27*
+  SS_840.65       - Allergy to serum and vaccine   3.45    3e-05  0.00011     5.74    2e-06  7.3e-06*
+  SS_840.5      - Allergy to radiographic dye      5.55  3.5e-23  4.3e-22*    6.78  2.6e-28  3.2e-27*
+  SS_840.4      - Latex allergy                     4.3  2.8e-24  3.6e-23*    5.32  9.1e-23  9.5e-22*
+  SS_840.8      - Allergies related to other dis   3.98 9.6e-204 1.3e-201*    4.01 6.2e-141 5.2e-139*
+  GE_972      Genetic neuromuscular disease        8.05 8.4e-105 3.7e-103*    11.4 1.2e-121 7.4e-120*
+  GE_972.5      - Familial dysautonomia [Riley-D   43.6  1.2e-91  4.6e-90*    46.9  1.2e-91  4.8e-90*
+  GE_978      Genetic disorders relating to grow   27.1 1.2e-148 8.7e-147*    38.4   6e-145 5.7e-143*
+  GE_978.2      - Herediatary connective tissue    37.5 1.4e-137 9.3e-136*    56.6 4.7e-128 3.2e-126*
+  GE_978.22       - Ehler's Danlos syndrome        40.8 3.2e-134 2.1e-132*    57.3 5.5e-126 3.5e-124*
+  MS_712      Joint derangements and related dis    8.5 1.9e-211 2.9e-209*    13.3   3e-238 5.4e-236*
+  MS_712.5      - Disorder of ligament               29 7.2e-199 8.7e-197*    38.7 3.1e-190   5e-188*
+  MS_712.51       - Hypermobility syndrome         32.8 1.4e-192 1.6e-190*    39.9 6.1e-186 8.2e-184*
+  MS_712.63     - Spinal instabilities*            6.69  2.4e-09  1.4e-08*    10.2  3.9e-13  2.5e-12*
+  MS_712.3      - Articular cartilage disorder     4.33  4.2e-05  0.00015     4.23  0.00016  0.00046 
+  NS_343      Disorders of autonomic nervous sys   22.2 4.7e-258 8.5e-256*    24.3 8.4e-248 1.7e-245*
+  NS_343.7      - Postural orthostatic tachycard   30.4 2.7e-189 2.7e-187*    36.4 8.1e-187 1.2e-184*
+  NS_343.3      - Complex regional pain syndrome   5.42  8.3e-11  5.7e-10*     5.1  2.6e-11  1.5e-10*
+  SS_841      Adverse effect of food (not allerg   27.1    2e-98  7.8e-97*    37.7  1.1e-66    3e-65*
+  BI_179      Immunodeficiencies                   5.09  8.8e-89  3.1e-87*    6.29 2.7e-112 1.4e-110*
+  BI_179.7      - Common variable immunodeficien   18.4  3.1e-21  3.6e-20*      19  1.2e-23  1.2e-22*
+  BI_179.6      - Selective deficiency of immuno   12.7  5.1e-14  4.4e-13*    12.6  3.4e-13  2.2e-12*
+  BI_179.1      - Hypogammaglobulinemia NOS        10.3  1.2e-36  2.3e-35*    10.3  7.1e-37  1.1e-35*
+  BI_179.4      - Selective deficiency of immuno   8.75  5.5e-12  4.1e-11*    13.2  8.3e-10  4.1e-09*
+  BI_179.9      - Immunodeficiency NOS             4.23  4.2e-37  7.7e-36*    5.29    6e-49  1.2e-47*
+  GE_981      Other genetic disesaes (arbitrary    9.03  1.1e-10  7.1e-10*    16.7  1.2e-19  1.1e-18*
+  GE_981.1      - Alpha-1-antitrypsin deficiency   15.9  1.5e-13  1.2e-12*    22.3  9.8e-22  9.9e-21*
+  GI_522.5    Allergic and dietetic gastroenteri   14.9  6.4e-12  4.7e-11*    22.4  5.1e-11  2.8e-10*
+  GI_532      Other disorders of the intestines    3.27  5.5e-29  8.1e-28*    3.95  2.2e-29  2.8e-28*
+  GI_532.5      - Small intestinal bacterial ove   12.2  5.5e-32    9e-31*      13  5.5e-26  6.3e-25*
+  BI_171.7    Eosinophilia                         17.1  1.2e-54    3e-53*    11.3  3.3e-25  3.6e-24*
+  MS_700      Diffuse diseases of connective tis    4.2    1e-71  2.9e-70*    4.77    4e-71  1.3e-69*
+  MS_700.6      - Autoinflammatory syndromes*      11.2  4.9e-12  3.7e-11*    30.3  6.7e-17  5.8e-16*
+  MS_700.2      - Sicca syndrome [Sjogren syndro   4.79  1.5e-31  2.4e-30*    6.06  7.4e-38  1.2e-36*
+  CM_750      Congenital malformations of nervou   11.2 2.3e-112 1.1e-110*    18.1 5.3e-120 3.1e-118*
+  GI_522.6    Eosinophilic gastroenteritis and c     11  1.6e-49  3.6e-48*    15.1  5.5e-60  1.3e-58*
+  GI_522.61     - Eosinophilic esophagitis         10.5  1.7e-45  3.5e-44*    13.9  3.2e-53  6.6e-52*
+  DE_679      Skin symptoms                        6.86  <1e-300  <1e-300*    5.11 7.2e-163 8.9e-161*
+  DE_679.3      - Flushing                         13.2 4.8e-164 4.3e-162*    9.26  1.5e-75    5e-74*
+  DE_679.4      - Pruritus                         7.11 8.9e-120 4.9e-118*    6.11    4e-65  1.1e-63*
+  DE_679.1      - Rash and other nonspecific ski   5.25 5.7e-162   5e-160*    3.52  3.6e-49  7.2e-48*
+  DE_668.6    Prurigo                              7.64  4.3e-14  3.7e-13*    8.99    6e-11  3.2e-10*
+  CV_443.2    Celiac artery compression syndrome   7.45    1e-08  5.9e-08*    12.5  9.8e-11  5.2e-10*
+  SS_847.3    Liver transplant                     7.45    6e-13  4.8e-12*    7.76  3.1e-14  2.2e-13*
+  EM_211      Disorders of adrenal glands          3.66    4e-31  6.3e-30*    4.15    1e-30  1.3e-29*
+  EM_211.1      - Adrenal hyperfunction            5.35  6.7e-14  5.8e-13*    5.96  5.6e-11  3.1e-10*
+  EM_211.13       - Cushing's syndrome             7.44  4.3e-10  2.7e-09*    7.76  1.1e-06    4e-06*
+  EM_211.11       - Hyperaldosteronism             5.61  1.2e-05  4.8e-05*    4.35    0.001   0.0026 
+  EM_211.2      - Adrenocortical insufficiency [   5.82  2.1e-27    3e-26*    6.22    4e-30  5.3e-29*
+  RE_463      Rhinitis and nasal congestion        3.59 4.5e-203 5.9e-201*    3.85 1.2e-158 1.3e-156*
+  RE_463.1      - Chronic rhinitis                 7.07 4.8e-102 2.1e-100*    9.86  1.7e-87  6.2e-86*
+  RE_463.2      - Allergic rhinitis                3.53 2.4e-155 1.9e-153*    3.54 2.9e-104 1.3e-102*
+  RE_463.23       - Allergic rhinitis, due to an   6.59  8.8e-27  1.2e-25*    9.38  3.1e-27  3.6e-26*
+  RE_463.3      - Vasomotor rhinitis*              4.89  1.4e-07  7.2e-07*    6.43  1.9e-09  9.5e-09*
+  NS_344      Disorders of the circulation of th   3.18  1.7e-12  1.3e-11*    3.58  2.2e-14  1.6e-13*
+  NS_344.3      - Cerebrospinal fluid leak         7.04  3.7e-10  2.3e-09*    15.8    2e-11  1.1e-10*
+  NS_344.2      - Benign intracranial hypertensi    3.7  3.2e-08  1.8e-07*    4.31  9.3e-11    5e-10*
+  GE_962      Disorders of amino-acid transport    3.15  7.8e-06  3.2e-05*    4.07  1.1e-07  4.6e-07*
+  GE_962.4      - Disturbances of sulphur-bearin   6.65  1.8e-07  8.8e-07*    8.16  1.6e-08  7.5e-08*
+  SS_807.3    Post COVID-19 condition*              6.4  1.2e-37  2.1e-36*    12.2  7.7e-42  1.3e-40*
+  ID_020      Borrelia                             6.13  4.9e-13  3.9e-12*    6.41  2.5e-08  1.1e-07*
+  ID_020.1      - Lyme disease                     4.55  6.4e-08  3.4e-07*    4.88  9.3e-05  0.00028 
+  GU_625.3    Vulvodynia                              6  5.4e-07  2.5e-06*     7.7  1.2e-06  4.4e-06*
+  CA_101.6    Malignant neoplasm of the liver an   5.08    3e-08  1.6e-07*    4.35  5.8e-07  2.3e-06*
+  CA_101.61     - Malignant neoplasm of the live   6.74    2e-09  1.2e-08*    5.93  2.7e-08  1.2e-07*
+  DE_672.1    Acute skin changes due to ultravio   6.26    2e-10  1.3e-09*     5.9  5.6e-06  1.9e-05*
+  GI_525      Intestinal malabsorption             5.83  3.6e-89  1.3e-87*    6.93  8.4e-78  2.9e-76*
+  GI_525.1      - Celiac disease                   5.35  1.3e-29  1.9e-28*    6.24  1.4e-26  1.6e-25*
+  DE_668.4    Dermatitis due to substances taken   5.69  3.5e-15  3.2e-14*    5.71  4.1e-07  1.6e-06*
+  NS_333.7    Narcolepsy                           5.52  4.1e-12  3.2e-11*    6.88  6.3e-12  3.7e-11*
+  SS_807.1    Chronic fatigue syndrome             5.46 8.5e-114 4.3e-112*    6.53  5.2e-92  2.1e-90*
+  RE_472      Diseases of vocal cords and larynx   5.32  8.1e-40  1.5e-38*    5.65  1.9e-30  2.5e-29*
+  RE_472.4      - Laryngeal spasm                  7.06  2.2e-06  9.7e-06*    4.97   0.0006   0.0016 
+  GI_516      Other diseases of stomach and duod   3.95  1.5e-52  3.6e-51*    5.56  4.3e-71  1.3e-69*
+  GI_516.4      - Gastroparesis                     5.3  5.6e-42  1.1e-40*    7.25  8.3e-56  1.8e-54*
+  GI_510.5    Dyskinesia of esophagus              5.07    8e-15  7.5e-14*    6.63  3.5e-17    3e-16*
+  SO_367.12   Allergic conjunctivitis              4.88  2.2e-31  3.5e-30*    7.97    4e-33  5.5e-32*
+  GI_552.1    Cholangitis                          5.31  5.9e-07  2.8e-06*    4.74  4.5e-06  1.6e-05*
+  CV_446.2    Orthostatic hypotension              5.12  1.1e-52  2.6e-51*     4.7  1.2e-36  1.8e-35*
+  SS_826      Other abnormal immunological findi   4.27  5.9e-83  1.9e-81*    5.03  1.5e-65    4e-64*
+  SS_826.4      - Other and unspecified nonspeci   4.66  4.6e-84  1.5e-82*    5.14  4.9e-58  1.1e-56*
+  NS_335      Nerve root and plexus disorders      3.19  1.7e-08  9.7e-08*    4.63  6.3e-13    4e-12*
+  NS_335.1      - Nerve plexus lesions             4.64  1.7e-10  1.1e-09*    6.08  3.6e-12  2.2e-11*
+  NS_324.33   Fasciculation*                       9.22  3.8e-16  3.7e-15*    4.48  1.6e-05  5.1e-05*
+  GI_529.2    Flatulence, eructation, and gas pa   4.36  2.5e-91  9.4e-90*    4.37  1.6e-55  3.5e-54*
+  CV_448.1    Raynaud's syndrome                   4.33  1.7e-30  2.6e-29*    4.92    2e-28  2.5e-27*
+  NS_334.1    Trigeminal nerve disorders [CN5]      4.3  1.9e-16  1.9e-15*    4.43    1e-12  6.5e-12*
+  NS_334.11     - Trigeminal neuralgia             4.18  2.2e-11  1.6e-10*    3.77  2.2e-08    1e-07*
+  DE_685      Disorders of sweat glands            4.01  1.1e-33    2e-32*    4.08  2.5e-22  2.6e-21*
+  DE_685.8      - Hyperhidrosis                    4.27  3.3e-30    5e-29*    4.09  1.7e-18  1.5e-17*
+  DE_685.82       - Generalized hyperhidrosis      4.53  2.1e-31  3.3e-30*    4.24  6.9e-19  6.4e-18*
+  EM_230.5    Early satiety                        4.19  7.1e-17  7.1e-16*    4.64    3e-13    2e-12*
+  RE_481.1    Pulmonary eosinophilia               4.44  0.00061   0.0019     4.17   0.0028   0.0063 
+  GI_524      Functional intestinal disorder       4.16 4.8e-105 2.2e-103*    4.68  3.7e-88  1.4e-86*
+  GI_524.1      - Irritable bowel syndrome         3.91  2.3e-88  7.8e-87*    4.45  1.4e-76  4.8e-75*
+  SS_835      Cytology and pathology findings      4.16  4.7e-25  6.3e-24*    4.95  6.4e-21  6.4e-20*
+  RE_471.5    Nasal polyps                         4.06  7.8e-10  4.8e-09*    7.04  1.3e-15    1e-14*
+  MS_717.3    Occipital neuralgia*                 3.96    2e-16  1.9e-15*    5.33    2e-20  1.9e-19*
+  GI_527.3    Functional dyspepsia                 3.92  3.5e-14  3.2e-13*    6.46  1.5e-17  1.3e-16*
+  GI_506.5    Disturbances of salivary secretion   3.82  1.4e-12  1.1e-11*    4.27  2.3e-11  1.3e-10*
+  GI_506.51     - Dry mouth*                       3.92  5.2e-09    3e-08*     5.4    7e-11  3.8e-10*
+  NS_337.2    Inflammatory polyneuropathy          3.53    2e-05  7.7e-05*     3.9  2.5e-05  7.9e-05*
+  NS_337.22     - Chronic inflammatory demyelina   3.83    0.001   0.0031     5.98  6.3e-05  0.00019 
+  GI_522.8    Duodenitis                           3.83  6.9e-07  3.3e-06*    4.98  5.9e-06    2e-05*
+  NS_321      Encephalitis, myelitis and encepha   3.82  0.00031    0.001     4.79    6e-05  0.00018 
+  GI_507.11   Recurrent oral aphthae [Recurrent    7.29  1.3e-08  7.5e-08*    3.79   0.0022   0.0051 
+  MS_724.1    Myalgia                              3.77 8.6e-132 5.2e-130*    4.21 1.3e-119 7.2e-118*
+  GU_592.12   Chronic cystitis                     3.73  7.6e-16  7.3e-15*    4.74  2.7e-15    2e-14*
+  ID_052.4    Infectious mononucleosis             3.65  2.7e-05   0.0001*    6.82  8.9e-07  3.5e-06*
+  NS_350.3    Abnormal reflex                      3.63  7.6e-07  3.5e-06*     4.2    2e-05  6.4e-05*
+  RE_494      Voice disturbance                    3.34  3.4e-23  4.2e-22*    4.29  6.4e-27  7.5e-26*
+  RE_494.1      - Dysphonia                         3.6    6e-23  7.3e-22*    4.72  4.9e-28    6e-27*
+  MB_291      Dissociative and somatoform disord   3.17  1.6e-13  1.3e-12*    3.86  2.5e-16    2e-15*
+  MB_291.1      - Conversion disorder              3.53  1.5e-07  7.7e-07*    4.62  7.7e-12  4.4e-11*
+  NS_331.63   Menstrual migraine                   4.11  5.7e-06  2.4e-05*    3.51    0.001   0.0025 
+  DE_668.3    Contact dermatitis                   3.48  9.6e-28  1.4e-26*    4.89  4.2e-31  5.8e-30*
+  NS_331.61   Migraine with aura                   3.48  7.6e-50  1.7e-48*    3.89  2.8e-48  5.3e-47*
+  GI_522.14   Microscopic colitis*                 3.47  1.1e-06  5.1e-06*    4.52  8.6e-08  3.7e-07*
+  NS_331.64   Chronic migraine without aura        3.45  3.4e-46  7.2e-45*    3.68  1.8e-45  3.4e-44*
+  EM_247.71   Hemochromatosis                      3.44  9.8e-07  4.5e-06*    3.99  1.4e-07    6e-07*
+  EM_252.51   Disorders of intestinal carbohydra   3.41    4e-08  2.2e-07*    4.38  1.2e-07  5.1e-07*
+  MS_741.4    Sprains and strains of hip and thi   3.41  1.8e-09  1.1e-08*    4.87  2.2e-09  1.1e-08*
+  BI_168.3    Spontaneous ecchymoses               3.38  8.2e-10    5e-09*    3.76  2.2e-07    9e-07*
+  ID_052.5    Cytomegalovirus [CMV]                3.34   0.0021   0.0058     8.58    1e-06    4e-06*
+  NS_331.3    Headache syndromes, non migraine     3.32  7.7e-26    1e-24*    3.92  8.2e-25  8.9e-24*
+  GI_554.3    Exocrine pancreatic insufficiency*   3.32  0.00059   0.0018     6.78  5.8e-07  2.3e-06*
+  GE_967      Genetic disorders of vitamin and m   3.07  0.00011  0.00039     5.14  4.2e-09    2e-08*
+  GE_967.4      - Hereditary hemochromatosis        3.3  0.00012  0.00042     4.01  4.6e-05  0.00014 
+  NS_331.4    Cluster headaches                    3.27  3.5e-05  0.00013     5.62    5e-06  1.7e-05*
+  SS_829.2    Abnormal level of blood mineral*     3.26  2.3e-12  1.8e-11*    3.66  7.8e-13  4.9e-12*
+  GE_982      Genetic susceptibility of disease,   3.23  2.6e-17  2.7e-16*    4.33  3.2e-24  3.4e-23*
+  RE_477      Inhalation lung injury                3.2   0.0041    0.011     3.79   0.0044   0.0097 
+  CM_768      Congenital deformities of chest an   3.16   0.0045    0.012      4.3   0.0024   0.0056 
+  CV_417.1    Palpitations                         3.13  1.2e-99  4.9e-98*    3.58  2.5e-80    9e-79*
+  GU_615      Endometriosis                        3.12  2.7e-17  2.8e-16*    3.77    1e-16  8.6e-16*
+  SO_395      Other diseases of inner ear          3.07   0.0058    0.014     3.92   0.0022   0.0052 
+  RE_475      Asthma                               3.06 1.1e-149 8.2e-148*    3.59 3.9e-156 4.2e-154*
+  DE_668.1    Atopic dermatitis                    3.05  6.9e-27  9.7e-26*    4.55  6.3e-36  9.3e-35*
+  DE_668.5    Lichen simplex chronicus             3.02   0.0041    0.011     3.59    0.011    0.022 
+  NS_333.4    Circadian rhythm sleep disorder      2.98  5.2e-05  0.00019     4.28  1.9e-05    6e-05*
+  BI_174.2    Splenomegaly                         2.96  1.7e-10  1.1e-09*    5.77  8.4e-16  6.6e-15*
+DIAGNOSIS-RELATED (report §6.2)
+  BI_180      Other disorders involving the immu   40.9  <1e-300  <1e-300*    61.1  <1e-300  <1e-300*
+  CA_120      Hemo onc - by cell of origin         14.7  <1e-300  <1e-300*    11.8   2e-284 4.6e-282*
+  CA_120.1    Myeloid                              29.3  <1e-300  <1e-300*    23.2 2.5e-299 6.6e-297*
+  SS_823      Abnormal serum enzyme levels         19.1  <1e-300  <1e-300*    11.2  <1e-300  <1e-300*
+  SS_823.2    Abnormal levels of other serum enz   27.2  <1e-300  <1e-300*    16.3  <1e-300  <1e-300*
+  CA_125      Other malignant neoplasms of lymph    234 1.1e-167 1.1e-165*     271 7.2e-113 3.7e-111*
+  BI_180.6    Mast cell activation syndrome [MCA    650 2.6e-100  1.1e-98*     519 1.4e-125 8.9e-124*
+  CA_120.15   Mast cell                             897  2.3e-71  6.5e-70*   1,141  1.5e-44  2.7e-43*
+  CA_125.1    Cutaneous mastocytosis*               185  3.9e-53  9.4e-52*     249  3.5e-44  6.2e-43*
+  BI_180.3    Paraproteinemias                     3.29  9.8e-11  6.7e-10*    4.08  8.7e-14  5.9e-13*
+  BI_180.31   Monoclonal gammopathy                3.31  1.4e-10  9.2e-10*    4.23  2.9e-14  2.1e-13*
+  GE_969      Genetic diseases of the immune sys   6.76  5.1e-07  2.4e-06*      13  6.6e-13  4.2e-12*
+  SS_823.1    Nonspecific elevation of levels of   1.36    0.013     0.03     1.86  4.4e-06  1.5e-05*
+  CA_120.22   Mature T-Cell                        2.57    0.047    0.092     1.92      0.2     0.29 
+  CA_120.13   Erythroid                             1.8      0.2     0.31     1.79     0.21      0.3 
+  CA_120.21   Mature B-cell                       0.744     0.25     0.36    0.984     0.95     0.96 
+  CA_120.2    Lymphoid                            0.816     0.34     0.46    0.933     0.75     0.82 
+LOWER IN HaT (both windows, and each window's top 5)
+  MB_282.1    Current tobacco use and nicotine d  0.584  7.1e-13  5.7e-12*   0.575  4.2e-09    2e-08*
+  CA_116      Secondary malignant neoplasm         0.29  8.7e-08  4.5e-07*   0.409  3.7e-05  0.00011 
+  MB_282      Nicotine dependence (current and h  0.776  4.9e-07  2.3e-06*   0.835   0.0021    0.005 
+  EM_202      Diabetes mellitus                   0.764  1.6e-06  7.1e-06*   0.821  0.00058   0.0015 
+  MS_745.1    Fracture of lower limb              0.512  9.4e-06  3.8e-05*   0.664    0.019    0.036 
+  EM_202.2    Type 2 diabetes                     0.788  5.2e-05  0.00019    0.862    0.013    0.026 
+  CV_424      Heart failure                       0.648  6.7e-05  0.00024    0.747   0.0043   0.0094 
+  CV_424.2    Systolic heart failure              0.441  0.00011   0.0004    0.678    0.023    0.043 
+  PP_910      Obesity or excessive weight gain i  0.293  0.00015  0.00052    0.477    0.014    0.028 
+  CA_128.1    Estrogen receptor postitive status  0.521  0.00024  0.00081    0.652    0.018    0.034 
+  MB_280.5    Stimulant use disorders             0.195  0.00032    0.001    0.162   0.0019   0.0045 
+  MB_280.8    Psychoactive substance abuse        0.584  0.00044   0.0014    0.461  0.00037    0.001 
+  CA_128      Estrogen, and other hormones and f  0.585  0.00068   0.0021    0.649   0.0097     0.02 
+  MB_280.51   Stimulant abuse or dependance       0.183  0.00082   0.0025    0.211   0.0081    0.017 
+  CA_105.1    Malignant neoplasm of the breast,   0.655   0.0016   0.0045     0.63   0.0017   0.0041 
+  CV_416.212  Persistent atrial fibrillation*     0.458   0.0035   0.0093    0.469   0.0036   0.0081 
+  MB_280.1    Alcohol use disorders                0.69   0.0088    0.021    0.577    0.002   0.0047 
+  CA_105      Malignant neoplasm of the breast     0.77    0.015    0.033    0.714   0.0041    0.009 
+  CV_416.214  Permanent atrial fibrillation*      0.334    0.016    0.036     0.33    0.015     0.03 
+  MS_745      Fractures                           0.663  5.2e-09    3e-08*    1.01     0.87     0.91 
+  CV_401      Hypertension                        0.799  9.2e-07  4.2e-06*   0.924    0.096     0.15 
+  MB_280.11   Alcohol abuse and dependence        0.721    0.034     0.07    0.472  0.00095   0.0024 
+ALSO CITED
+  GI_527      Abdominal pain                       2.64 1.3e-129 7.5e-128*     3.1   3e-140 2.4e-138*
+  200 lines; every tested phecode: runs\pvalues\all_phecodes_p_q.csv
+Screenshot the whole file, page by page, and paste the pages into the chat.

@@ -314,6 +314,24 @@ Removed: `bundling/phewas_vm_bundle.py` (the 2026-10-05 bundle, superseded and r
 
 **Amended (2026-10-09):** one command, one file: `python phewas pvalues` writes every row to `runs/pvalues/pvalues.txt`.
 
+### D48. Numbers that leave the VM by screenshot are checked on the VM before use
+
+**Context.** Results reach this repo only as screenshots, transcribed by hand; the user wants a true double-check before p-values go into the reports (2026-10-09).
+
+**Decision.** Transcriptions are rebuilt into the exact files the VM wrote, by the VM's own code path: the transcribed values go through pandas 2.2.3 (the VM's version, whose default parser leaves tails like `2.7059999999999998e-189` that the VM files carry) and the `pvalues` formatting. They are then checked on the VM with `python phewas verify` against the originals, line by line and field by field. Here, before that, two independent transcriptions (the `pvalues.txt` and the full CSV screenshots) are compared, and the report's cluster ORs serve as a third source. The reports change only after `verify` reports everything identical.
+
+**Rejected.** Exact float parsing (`round_trip`) in `pvalues`: more precise, but it changes how some values round to two digits (4.55e-203 prints 4.6e-203, not 4.5e-203), so the VM's existing files could no longer be reproduced.
+
+**Done (2026-10-09).** `verify` on the VM: `pvalues.txt` (207 lines) and `all_phecodes_p_q.csv` (1,822 phecodes, 1,823 lines) identical, character for character, after two transcription errors it found were fixed (an OR read 2.16643 for 2.11643, a q missing its last digit) and three cluster rows were put in the VM's order. `verify` now prints each file's SHA-256 (first 8 characters, as PowerShell's `Get-FileHash` shows them). The reports were rebuilt from the verified files into `docs/reports/run3_2026-10-09/`; every p in their cluster and leading tables was checked against the verified `.txt` (654 cells, none different).
+
+### D49. Report folders: the newest run kept, older runs in history
+
+**Context.** By 2026-10-09 `docs/reports/` held run 1 (first PheWAS), run 2 (rerun with sex restriction) and run 3 (run 2's results with p-values); the user asked to clean up.
+
+**Decision.** `docs/reports/` keeps only the newest run folder (`run3_2026-10-09/`) beside the shared `report-reference.docx` and `pdf-header.tex`. Runs 1 and 2 were committed (commit before this decision's) and then removed; they stay in the git history. The full report is named "full report", the concise one "preliminary report" (the user's naming, 2026-10-09). PDF tables are set one size smaller than the text (`pdf-header.tex`), so tables with p-value columns fit.
+
+**Amends D46** (one folder per run, all kept).
+
 ------------------------------------------------------------------------
 
 ## The Cosmos Pull

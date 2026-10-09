@@ -29,3 +29,7 @@
 \renewcommand{\@maketitle}{\begin{center}{\usekomafont{title}\huge\@title\par}\vskip 0.4em{\large\@author\par}\vskip 0.2em{\@date\par}\end{center}\vspace{0.3em}}
 \makeatother
 \RedeclareSectionCommand[beforeskip=0pt,afterskip=0.5\baselineskip]{section}
+
+% Tables one size smaller than the text, so wide tables (many columns of numbers) fit.
+\usepackage{etoolbox}
+\AtBeginEnvironment{longtable}{\footnotesize}

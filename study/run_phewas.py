@@ -14,6 +14,7 @@ On the VM, from the pheauxWAS folder, everything is one short command (D36, D37)
                             the mast-cell neoplasm subgroup, prevalence in each group -> runs\review\
     python phewas cluster   one page: the strongest associations, consistent in both windows -> runs\cluster\
     python phewas pvalues   p and q for every phecode the reports cite -> runs\pvalues\pvalues.txt
+    python phewas verify    transcriptions made off the VM, checked against the VM's own files
     python phewas all       move the last run to runs\archive\, then pre, post, review and cluster,
                             every page in one file -> runs\all_results.txt
     python phewas update    unpack the newest *bundle*.py in this folder over these scripts
@@ -1164,6 +1165,108 @@ def pvalues(args) -> None:
     print(f"\nDONE: everything is in runs\\pvalues\\{name}. Open it in VSCodium and screenshot it page by page.")
 
 
+# python phewas verify: the transcriptions made off the VM, checked against the VM's own files (D48).
+def verify(args) -> None:
+    """Compare files transcribed from screenshots with the VM's originals: pvalues_transcribed.txt
+    with runs/pvalues/pvalues.txt line by line, and all_phecodes_p_q_transcribed.csv with
+    runs/pvalues/all_phecodes_p_q.csv field by field (numbers compared as numbers, exactly).
+    The transcriptions are looked for in this folder and in runs/pvalues/."""
+    import csv
+    import hashlib
+    import math
+    root = args.root
+    def fingerprint(path: Path) -> str:
+        """SHA-256 of the file's bytes (first 8, as PowerShell's Get-FileHash shows them) and of its
+        text with line endings made \\n, which survives a copy between Windows and a Mac."""
+        raw = path.read_bytes()
+        text = raw.replace(b"\r\n", b"\n")
+        return f"sha256 {hashlib.sha256(raw).hexdigest()[:8].upper()} (as text: {hashlib.sha256(text).hexdigest()[:8].upper()})"
+    def find(name: str) -> Path | None:
+        return next((p for p in (root / name, root / "runs" / "pvalues" / name) if p.exists()), None)
+    L = [f"VERIFY {time.strftime('%Y-%m-%d %H:%M')} (python phewas verify): transcriptions against the VM's files", ""]
+    problems = 0
+
+    # 1. pvalues.txt, line by line (the first line holds the time it was made: compared too).
+    mine, theirs = find("pvalues_transcribed.txt"), root / "runs" / "pvalues" / "pvalues.txt"
+    if mine is None or not theirs.exists():
+        L.append(f"TXT: skipped ({'pvalues_transcribed.txt not found here' if mine is None else 'run python phewas pvalues first'})")
+    else:
+        a = mine.read_text(encoding="utf-8").splitlines()
+        b = theirs.read_text(encoding="utf-8").splitlines()
+        diff = [(i + 1, x, y) for i, (x, y) in enumerate(zip(a, b)) if x != y]
+        if len(a) != len(b):
+            diff.append((min(len(a), len(b)) + 1, f"[{len(a)} lines]", f"[{len(b)} lines]"))
+        problems += len(diff)
+        L.append(f"  transcribed {mine.name}: {fingerprint(mine)}")
+        L.append(f"  VM's        {theirs.name}: {fingerprint(theirs)}")
+        L.append(f"TXT: {len(b)} lines on the VM, {len(a)} transcribed; "
+                 + ("IDENTICAL" if not diff else f"{len(diff)} DIFFERENT lines (transcribed / VM):"))
+        for n, x, y in diff[:12]:
+            L += [f"  line {n}:", f"    T: {x.strip()}", f"    V: {y.strip()}"]
+        if len(diff) > 12:
+            L.append(f"  ... and {len(diff) - 12} more")
+    L.append("")
+
+    # 2. all_phecodes_p_q.csv, field by field.
+    mine, theirs = find("all_phecodes_p_q_transcribed.csv"), root / "runs" / "pvalues" / "all_phecodes_p_q.csv"
+    if mine is None or not theirs.exists():
+        L.append(f"CSV: skipped ({'all_phecodes_p_q_transcribed.csv not found here' if mine is None else 'run python phewas pvalues first'})")
+    else:
+        def load(p: Path) -> tuple[list[str], dict]:
+            with open(p, newline="", encoding="utf-8") as f:
+                rd = csv.reader(f)
+                head = next(rd)
+                return head, {r[0]: r for r in rd if r}
+        ha, a = load(mine)
+        hb, b = load(theirs)
+        def same(x: str, y: str) -> bool:
+            if x == y:
+                return True
+            try:
+                fx, fy = float(x), float(y)
+            except ValueError:
+                return x.strip().upper() == y.strip().upper()     # True/TRUE
+            # pheauxWAS writes p and q to 4 significant digits and ORs to 6; reading them back can
+            # leave a tail like 8.374999999999999e-248 for 8.375e-248. Any real difference is far
+            # larger than one part in 10^12.
+            return math.isclose(fx, fy, rel_tol=1e-12, abs_tol=0.0) or (math.isnan(fx) and math.isnan(fy))
+        bad = []
+        if ha != hb:
+            bad.append(("header", "", " ".join(ha)[:60], " ".join(hb)[:60]))
+        only_a, only_b = sorted(set(a) - set(b)), sorted(set(b) - set(a))
+        for k in sorted(set(a) & set(b)):
+            for j, col in enumerate(hb):
+                x = a[k][j] if j < len(a[k]) else ""
+                y = b[k][j] if j < len(b[k]) else ""
+                if not same(x, y):
+                    bad.append((k, col, x, y))
+        problems += len(bad) + len(only_a) + len(only_b)
+        ta = mine.read_text(encoding="utf-8").splitlines()
+        tb = theirs.read_text(encoding="utf-8").splitlines()
+        same_text = sum(1 for x, y in zip(ta, tb) if x == y)
+        L.append(f"  transcribed {mine.name}: {fingerprint(mine)}")
+        L.append(f"  VM's        {theirs.name}: {fingerprint(theirs)}")
+        L.append(f"CSV text: {same_text:,} of {len(tb):,} lines character-identical"
+                 + (" (whole file identical)" if same_text == len(tb) == len(ta) else
+                    "; the field check below decides (a value can print differently but be the same number)"))
+        L.append(f"CSV: {len(b):,} phecodes on the VM, {len(a):,} transcribed, {len(set(a) & set(b)):,} in both; "
+                 + ("ALL FIELDS IDENTICAL" if not (bad or only_a or only_b) else f"{len(bad)} DIFFERENT fields:"))
+        for k, col, x, y in bad[:20]:
+            L.append(f"  {k:<11} {col:<18} T: {x[:24]:<24} V: {y[:24]}")
+        if len(bad) > 20:
+            L.append(f"  ... and {len(bad) - 20} more")
+        if only_b:
+            L.append(f"  on the VM but not transcribed ({len(only_b)}): " + ", ".join(only_b[:15]) + (" ..." if len(only_b) > 15 else ""))
+        if only_a:
+            L.append(f"  transcribed but not on the VM ({len(only_a)}): " + ", ".join(only_a[:15]) + (" ..." if len(only_a) > 15 else ""))
+    L += ["", "RESULT: " + ("everything checked is identical" if problems == 0 else f"{problems} difference(s); see above"),
+          "Copy this whole page into the chat."]
+    text = "\n".join(L)
+    (root / "runs" / "pvalues").mkdir(parents=True, exist_ok=True)
+    (root / "runs" / "pvalues" / "verify.txt").write_text(text + "\n", encoding="utf-8")
+    print(text)
+
+
 def results(args) -> None:
     """The one-sheet of one run (pre, post or a run folder's name; default: the latest)."""
     runs = args.root / "runs"
@@ -1322,6 +1425,8 @@ def main() -> None:
                         help="keep pyPheWAS's feature-matrix CSVs (gigabytes on the real data)")
     sub.add_parser("pvalues", help="p and q values for every phecode the reports cite, from the existing results, "
                    "all in runs/pvalues/pvalues.txt (pvalues 2: one page only)").add_argument("page", nargs="?", type=int)
+    sub.add_parser("verify", help="compare pvalues_transcribed.txt and all_phecodes_p_q_transcribed.csv "
+                   "(copied into this folder) with the VM's own files")
     sub.add_parser("selftest", help="check the runner's phecodeX wiring (sex restriction) on a small made-up cohort")
     sub.add_parser("all", parents=[common], help="move the last run to runs/archive/, then pre, post, review "
                    "and cluster; every page in runs/all_results.txt")
@@ -1330,7 +1435,7 @@ def main() -> None:
     r = sub.add_parser("run", parents=[common], help="any one window, every tool")
     r.add_argument("--window", choices=["pre", "post", "all"], required=True)
     r.add_argument("--lookback-years", type=float, help="with --window pre: the years before index (study: 3)")
-    commands = {"check", "update", "vscode", "match", "balance", "sheet", "results", "review", "cluster", "all", "selftest", "pvalues", "pre", "post", "run"}
+    commands = {"check", "update", "vscode", "match", "balance", "sheet", "results", "review", "cluster", "all", "selftest", "pvalues", "verify", "pre", "post", "run"}
     argv = [a[2:] if a.startswith("--") and a[2:] in commands else a for a in sys.argv[1:]]
     args = ap.parse_args(argv)
 
@@ -1343,7 +1448,7 @@ def main() -> None:
     elif args.command == "post":
         args.command, args.window, args.lookback_years = "run", "post", None
     {"check": check, "update": update, "vscode": vscode, "match": match, "balance": balance, "sheet": sheet, "results": results,
-     "review": review, "cluster": cluster, "all": study_all, "run": run, "pvalues": pvalues,
+     "review": review, "cluster": cluster, "all": study_all, "run": run, "pvalues": pvalues, "verify": verify,
      "selftest": lambda a: sys.exit(selftest(a))}[args.command](args)
 
 

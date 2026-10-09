@@ -310,7 +310,7 @@ Lower in HaT (FDR \< 0.05), top 5: current tobacco use 0.575 \[0.478–0.691\]; 
 
 ### The review checks and the full cluster (2026-10-08)
 
-Discussed with the review reports (`docs/reports/run2_2026-10-08/` (full and concise reports), which have the tables); from `python phewas review` and `python phewas cluster` on the rerun.
+Discussed with the review reports (`docs/reports/run3_2026-10-09/`, full and concise, which have the tables); from `python phewas review` and `python phewas cluster` on the rerun.
 
 - **How far everything is shifted.** The median odds ratio across all tested phecodes is 1.46 before index and 1.75 after; ten negative-control phecodes with no known link to HaT (cataract, cerumen, myopia and others) give 1.42 and 1.89. So HaT patients carry roughly 1.5 to 1.9 times the odds of almost any code, mostly from more contact with care: ED visits in the year before index (unmatched) 37% vs 30%, and clinic visits after index 6.45 vs 4.23 days a year. An odds ratio of 3 is therefore only about twice the background; urticaria (47), anaphylaxis (61), POTS (30) and Ehlers–Danlos (41) are twenty to forty times it.
 - **Cases.** Only 18% have a serum tryptase on record (probably outside laboratories); of those, 92% are at or above 8 ng/mL (median 15.3), as expected for HaT. 64% have D89.44 on two or more dates.
