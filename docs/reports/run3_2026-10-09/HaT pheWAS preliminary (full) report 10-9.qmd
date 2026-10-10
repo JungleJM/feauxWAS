@@ -33,7 +33,7 @@ format:
 - **Results.** Pre-index: 1,817 phecodes tested, **482 Bonferroni-significant** (470 higher in HaT), 858 at FDR \< 0.05. Post-index: 1,611 tested, 514 Bonferroni-significant (513 higher). Leading associations in both windows: urticaria (OR 47.5 pre), anaphylaxis (61.2), insect and food allergy, POTS (30.4), joint hypermobility (32.8), flushing, rhinitis/asthma — alongside exposure-adjacent mast-cell and tryptase codes (MCAS, R74.8, mastocytosis).
 - **Verification.** An independent implementation (pyPheWAS) on identical inputs reproduces the estimates (r = 0.999 on non-separated phecodes, all in the same direction).
 - **A mastocytosis subgroup.** 30% of matched cases carry a mastocytosis code (D47.0x, C96.2x) at some point, mostly D47.09 ("other mast cell neoplasms"); 9% carry systemic mastocytosis (D47.02). HaT is enriched in systemic mastocytosis, whose patients are routinely tested for it. The subgroup does not explain the phenotype: cases without these codes still show it (anaphylaxis 15.1% vs 0.6% of controls, POTS 10.2% vs 0.5%) (§8.1.12).
-- **Main interpretive caveat.** Because HaT is diagnosed by testing driven by symptoms, pre-index associations largely describe the phenotype that leads to testing (indication), not consequences of HaT. Persistence after index supports these being the HaT phenotype rather than transient workup.
+- **Main interpretive caveat.** Because HaT is diagnosed by testing driven by symptoms, pre-index associations largely describe the phenotype that leads to testing (indication), not consequences of HaT. Persistence after index shows these conditions are real and lasting rather than transient workup codes; it does not show that HaT causes them.
 - **Tryptase is on record for only 18% of cases** (704 of 3,911). Of those measured, 92% have a baseline serum tryptase ≥ 8 ng/mL (median 15.3), consistent with HaT; but for most cases the test that typically starts the workup is not in the data, probably because it was run at an outside or reference laboratory or recorded under a lab component or unit not captured here. Case status rests on the D89.44 code (§3.1).
 
 [^1]: Three counts of patients with any D89.44 appear in this study, from different date ranges: 5,974 in all years (profile query 2), 5,967 with D89.44 dated 2018-01-01 to 2026-06-01 (profile queries, 2026-10-01), and 5,969 in the study's pull, 2015-01-01 to 2026-06-01 (2026-10-02). The analysis uses the pull's 5,969.
@@ -53,7 +53,7 @@ To identify, across the phenome, diagnoses that are more or less common in patie
 | Vocabulary | ICD-10-CM only |
 | HaT pull | 2026-10-02: every patient with D89.44; their encounters, diagnosis events (one row per event and code) and tryptase results |
 | Control pull | 2026-10-06: 300,000 patients; 29.8 M encounters, 92.1 M diagnosis rows, 948 tryptase results |
-| Software | Python 3.13 (pandas, numpy), R 4.6.1 (MatchIt, cobalt), pheauxWAS 1.1.1, pyPheWAS (commit 2a8fff1) |
+| Software | Python 3.13 (pandas, numpy), R 4.6.1 (MatchIt, cobalt), pheXWAS 1.2.0, pyPheWAS (commit 2a8fff1) |
 
 Patient-level data never leave the VM; all code is developed and tested on synthetic data of identical structure.
 
@@ -69,7 +69,7 @@ Patient-level data never leave the VM; all code is developed and tested on synth
 
 - **Pool:** a reproducible random sample of Cosmos patients without D89.44 (hash of patient key, \~1% of Cosmos, first 300,000 in hash order). HaT patients are excluded by key; any control with a D89.44 anywhere is also dropped.
 - **Pseudo-index:** one randomly chosen completed clinic visit (Office Visit or Follow-Up) between 2021-10-01 and 2026-06-01. Controls are thus anchored on an opportunity to be observed, not on any diagnosis. (Selecting controls by diagnoses was rejected as conditioning on outcomes.)
-- Controls are "no known HaT", not genotyped: see §7.
+- Controls are "no known HaT", not genotyped: see §8.1, item 5.
 
 ### 3.3 Variables (identical code for both groups)
 
@@ -114,7 +114,7 @@ matchit(HaT_Flag ~ AgeAtIndex + YearsBeforeIndex + YearsAfterIndex +
 
 - Propensity score from logistic regression; nearest-neighbour matching without replacement.
 - Exact on sex (sex-specific phecodes) and calendar quarter of index (secular change in coding, Cosmos coverage and the COVID period).
-- Caliper 0.2 SD of the propensity score, on the probability scale. Austin (2011)[^2] recommends 0.2 SD of the *logit* of the propensity score; see §8.2.3. Variable ratio results: cases get up to 10 controls, fewer where close controls are exhausted.
+- Caliper 0.2 SD of the propensity score, on the probability scale. Austin (2011)[^2] recommends 0.2 SD of the *logit* of the propensity score; see §8.2.3. The ratio varies: each case gets up to 10 controls, fewer where no more controls lie within the caliper.
 - `log1p` of visits to limit the influence of very heavy users.
 
 [^2]: Austin PC. Optimal caliper widths for propensity-score matching when estimating differences in means and differences in proportions in observational studies. *Pharmaceutical Statistics* 2011;10(2):150–161. From simulations, it recommends a caliper of 0.2 standard deviations of the logit of the propensity score. MatchIt applies `caliper = 0.2, std.caliper = TRUE` to the distance as estimated (the probability, with `distance = "glm"`) unless `link = "linear.logit"` is given.
@@ -144,7 +144,7 @@ matchit(HaT_Flag ~ AgeAtIndex + YearsBeforeIndex + YearsAfterIndex +
 | Model | `phecode ~ HaT_Flag + AgeAtIndex + Sex + Race + Ethnicity + YearsBeforeIndex + ClinicVisits365Before` (+ `YearsAfterIndex` in post); unconditional logistic regression on the matched cohort, unweighted, ignoring matched sets |
 | Separation | Firth penalized regression when separation is detected (including a 0/1 exposure with an empty cell against the outcome); Wald CI, penalized likelihood-ratio p |
 | Multiplicity | Bonferroni (α = 0.05 / phecodes tested in that window) and Benjamini–Hochberg q-values |
-| Verification | pyPheWAS (Phecode 1.2, ≥ 1 code, no exclusions, L1-penalized logistic, α = 0.1) run on identical events, compared phecode-for-phecode with pheauxWAS run under pyPheWAS's map and rules |
+| Verification | pyPheWAS (Phecode 1.2, ≥ 1 code, no exclusions, L1-penalized logistic, α = 0.1) run on identical events, compared phecode-for-phecode with pheXWAS run under pyPheWAS's map and rules |
 
 ### 5.1 Which ICD codes were tested, and how specific codes can be examined
 
@@ -193,7 +193,7 @@ These capture the diagnostic workup or the diagnosis itself rather than independ
 
 - **R74.8** (abnormal serum enzymes) is how a raised tryptase is usually coded: the test that leads to genetic testing. It is highest before index and falls after.
 - **D89.40–D89.49** (mast cell activation) are often the label used before the specific HaT code (1,523 cases had one before their first D89.44).
-- **D47.0x and C96.2x** (mastocytosis; ICD-10-CM classifies mastocytosis among the neoplasms of hematopoietic tissue, following the WHO, though most systemic mastocytosis is indolent) point to a **subgroup**: HaT is more common in systemic mastocytosis than in the general population, and patients with mastocytosis are tested for HaT, so some cases are mastocytosis patients who also carry HaT. In CA_125, 682 patients are phecode cases before index with an OR of 234; an OR this large means nearly all of them are HaT patients, so the subgroup may be of the order of one in six cases. Their own phenotype (anaphylaxis, venom reactions, flushing, bone disease) overlaps the HaT signal (§8.1.12).
+- **D47.0x and C96.2x** (mastocytosis; ICD-10-CM classifies mastocytosis among the neoplasms of hematopoietic tissue, following the WHO, though most systemic mastocytosis is indolent) point to a **subgroup**: HaT is more common in systemic mastocytosis than in the general population, and patients with mastocytosis are tested for HaT, so some cases are mastocytosis patients who also carry HaT. In CA_125, 682 patients are phecode cases before index with an OR of 234; an OR this large means nearly all of them are HaT patients, and in all, 30% of matched cases carry a mastocytosis code at some point (9% systemic mastocytosis, D47.02). Their own phenotype (anaphylaxis, venom reactions, flushing, bone disease) overlaps the HaT signal (§8.1.12).
 
 | Phecode | Content (ICD-10-CM) | OR pre | p pre | OR post | p post |
 |------------|------------|------------|------------|------------|------------|
@@ -439,7 +439,7 @@ Three cautions. Many rows are small: 0.5% of HaT patients is about 20 people, so
 
 The lower overall correlation arises solely from separated phecodes, where unpenalized ML estimates diverge and pyPheWAS's L1 penalty shrinks them toward zero. The largest non-separated differences (0.20 pre, 0.41 post, in log-odds) are at large effects, where the L1 penalty shrinks most.
 
-**What this does and does not show.** It verifies the computation: phecode mapping, case counting, covariate handling and model fitting give the same answers in two independent implementations. It does **not** validate the study's own results directly, because the comparison is run under pyPheWAS's rules (Phecode 1.2 map, 1 code makes a case, no exclusions, no Firth). The study's phecodeX analysis, with its stricter case definition and exclusions, is a different analysis by design; its correctness rests on the same code paths verified here plus the tool's self-tests.
+**What this does and does not show.** It verifies the computation: phecode mapping, case counting, covariate handling and model fitting give the same answers in two independent implementations. It does **not** validate the study's own results directly, because the comparison is run under pyPheWAS's rules (Phecode 1.2 map, 1 code makes a case, no exclusions, no Firth). The study's phecodeX analysis, with its stricter case definition (2 dates) and sex restriction, is a different analysis by design; its correctness rests on the same code paths verified here plus the tool's self-tests.
 
 ## 7. Interpretation
 
@@ -491,7 +491,7 @@ Every weakness we can identify, so reviewers can weigh the results against them.
 1.  **Odds ratios exaggerate risk ratios for common outcomes.** Several phecodes are common (allergy: 6,803 cases, \~21% of the cohort); ORs overstate relative risks there. *Remedy:* report absolute prevalences in each group, or risk ratios for common phecodes.
 2.  **Firth fits for 21–24% of tested phecodes** (387 of 1,817 before index, 390 of 1,611 after). These report Wald intervals with penalized likelihood-ratio p-values, which can disagree; profile-likelihood intervals would be consistent. Some separation arises from sparse covariate levels (small race/ethnicity groups) rather than the exposure.
 3.  **Multiplicity under dependence.** Bonferroni is very conservative with correlated phecodes; BH assumes positive dependence (likely acceptable). Hierarchical FDR would match the structure better.
-4.  **Extreme p-values.** Many underflow (q \< 1e-300); they carry no ranking information. Effect sizes and intervals should be the basis of interpretation.
+4.  **Extreme p-values.** Many p-values underflow (\<1e-300); they carry no ranking information. Effect sizes and intervals should be the basis of interpretation.
 5.  **Winner's curse.** Effect sizes for the top hits are selected for being extreme and will tend to shrink on replication.
 6.  **No replication.** A single discovery analysis; no independent cohort, held-out sample, or negative-control outcomes yet.
 
@@ -499,7 +499,7 @@ Every weakness we can identify, so reviewers can weigh the results against them.
 
 1.  **Cosmos data quality.** Multi-organization EHR data with varying coding practices, missing race/ethnicity grouped as "Unknown", and site participation changing over time (sites' Cosmos-usable dates are pulled but not yet used to restrict observation).
 2.  **Pull window.** History starts 2015-01-01; a patient whose first D89.44 predates 2015 gets a later index (rare, since the code dates from 2021, but relevant to earlier D89.4x codes).
-3.  **Custom software.** The study's PheWAS runs on pheauxWAS, a purpose-written tool. It is verified against pyPheWAS (Section 6.5, r = 0.999 on comparable phecodes) and by self-tests, but it is not a published package. A fix during this work (v1.1.1) added detection of separation when all of a phecode's cases are exposed; earlier synthetic results were unchanged. A second fix (2026-10-08): the first study run never gave the tool phecodeX's sex file, so its 320 sex-specific phecodes were analysed in both sexes. All results here are from the rerun with it; the change was small (about 85 fewer Firth fits per window, significance counts within single figures, leading odds ratios unchanged), and every run now checks that each sex-specific phecode was restricted.
+3.  **Custom software.** The study's PheWAS runs on pheXWAS, a purpose-written tool. It is verified against pyPheWAS (Section 6.5, r = 0.999 on comparable phecodes) and by self-tests, but it is not a published package. A fix during this work (v1.1.1) added detection of separation when all of a phecode's cases are exposed; earlier synthetic results were unchanged. A second fix (2026-10-08): the first study run never gave the tool phecodeX's sex file, so its 320 sex-specific phecodes were analysed in both sexes. All results here are from the rerun with it; the change was small (about 85 fewer Firth fits per window, significance counts within single figures, leading odds ratios unchanged), and every run now checks that each sex-specific phecode was restricted.
 4.  **Small cells.** Cosmos restricts publication of counts of 1–10 patients; phecodes near the 20-case minimum may have exposure-group cells under 11 and need masking before publication.
 
 ## 9. Planned Sensitivity Analyses
@@ -547,6 +547,7 @@ Every weakness we can identify, so reviewers can weigh the results against them.
 
 ## Appendix: Reproducibility
 
-- **Pipeline (VM):** `python phewas match` → `python phewas balance` → `python phewas pre` → `python phewas post`; `python phewas sheet` summarizes. Each run writes `run_log.txt` (commands, durations, outcomes); pheauxWAS logs SHA-256 hashes of itself and every input.
-- **Outputs:** `runs/matching/` (matched cohort, MatchIt summary, love plot, balance), `runs/pre_3y/` and `runs/post/` (inputs, pheauxWAS results CSV and Manhattan plot, pyPheWAS regressions, comparison).
+- **PheWAS tool:** pheXWAS 1.2.0 (formerly pheauxWAS), Python and numpy only. The files, logs and folders from this run still carry the old name (`pheauxWAS/pheauxWAS.py`, `runs/pre_3y/pheauxwas/`, `runs/post/pheauxwas/`).
+- **Pipeline (VM):** `python phewas match` → `python phewas balance` → `python phewas pre` → `python phewas post`; `python phewas sheet` summarizes. Each run writes `run_log.txt` (commands, durations, outcomes); pheXWAS logs SHA-256 hashes of itself and every input.
+- **Outputs:** `runs/matching/` (matched cohort, MatchIt summary, love plot, balance), `runs/pre_3y/` and `runs/post/` (inputs, pheXWAS results CSV and Manhattan plot, pyPheWAS regressions, comparison).
 - **Design rationale:** decision log in `docs/plan/decisions.md` (D-numbers); full narrative in `docs/phewasHistoryAndDecisions.md`.

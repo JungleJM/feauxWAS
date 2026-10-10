@@ -38,7 +38,7 @@ format:
 
 **Outcomes and model.** Diagnoses are grouped into phecodes (phecodeX). A patient is a phecode case with the code on 2 or more dates; sex-specific phecodes are analysed in one sex. For each phecode with at least 20 cases: logistic regression of the phecode on HaT, adjusted for age, sex, race, ethnicity, years of record and prior-year clinic visits (Firth regression when separation occurs), with Bonferroni and false-discovery-rate (FDR) correction. **Primary window:** the 3 years before index. **Sensitivity window:** after index. The D89.44 code itself is removed from the outcomes. Every recorded ICD-10-CM diagnosis enters; about 82% of diagnosis rows map to a phecode, and the unmapped rows are encounter, status and screening Z-codes.
 
-**Verification.** The published pyPheWAS package, run on identical inputs and compared under its own rules, agrees with our tool (pheauxWAS) phecode for phecode: correlation 0.999 where neither fit is separated, every estimate in the same direction.
+**Verification.** The published pyPheWAS package, run on identical inputs and compared under its own rules, agrees with our tool (pheXWAS) phecode for phecode: correlation 0.999 where neither fit is separated, every estimate in the same direction.
 
 ## 2. What we found
 
@@ -130,7 +130,7 @@ Every weakness we can identify, each with its likely effect. **Major** marks tho
 24. **Odds ratios overstate risk ratios** for common outcomes (allergy affects about 21% of the cohort); the prevalence columns above show absolute differences.
 25. **Firth regression for 21–24% of phecodes**, with Wald intervals and penalized likelihood-ratio p-values, which can disagree.
 26. **Multiplicity under dependence.** Bonferroni is conservative for correlated phecodes; hierarchical FDR would fit better.
-27. **Extreme p-values** underflow (q \< 1e-300) and carry no ranking information; effect sizes should guide reading.
+27. **Extreme p-values** underflow (p \<1e-300) and carry no ranking information; effect sizes should guide reading.
 28. **Winner's curse.** The largest effects will tend to shrink on replication.
 29. **No replication** in an independent cohort yet.
 
@@ -138,7 +138,7 @@ Every weakness we can identify, each with its likely effect. **Major** marks tho
 
 30. **Cosmos data quality.** Coding varies across organizations; site participation dates are not yet used to restrict observation.
 31. **Pull window** starts in 2015, so a first D89.44 before then gets a later index (rare).
-32. **Custom software.** pheauxWAS is purpose-written, verified against pyPheWAS and by self-tests. One fix during the work: sex-specific phecodes were first analysed in both sexes; the rerun with the fix changed little and all results here are from it.
+32. **Custom software.** pheXWAS is purpose-written, verified against pyPheWAS and by self-tests. One fix during the work: sex-specific phecodes were first analysed in both sexes; the rerun with the fix changed little and all results here are from it.
 33. **Small cells.** Counts of 1–10 must be masked before publication.
 
 ## 5. Planned sensitivity analyses
